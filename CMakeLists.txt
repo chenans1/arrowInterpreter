@@ -8,12 +8,12 @@ project(PLUGINNAME VERSION 0.0.1 LANGUAGES CXX)
 add_subdirectory(extern/CommonLibVR-ng)
 include(extern/CommonLibVR-ng/cmake/CommonLibSSE.cmake)
 
-include("C:/SKSEdev/repos/CommonLibVR-NG/cmake/CommonLibSSE.cmake")
 set(BUILD_TESTS OFF CACHE BOOL "Build unit tests for CommonLibVR." FORCE)
 set(ENABLE_SKYRIM_VR OFF CACHE BOOL "" FORCE)
 
 
-set(OUTPUT_FOLDER "C:/SKSEdev/output/")
+#set(OUTPUT_FOLDER "C:/SKSEdev/output/")
+set(OUTPUT_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/output")
 # Setup your SKSE plugin as an SKSE plugin!
 # find_package(CommonLibSSE CONFIG REQUIRED)
 

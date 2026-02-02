@@ -31,12 +31,6 @@
       "name": "release",
       "inherits": [ "base" ],
       "displayName": "Release",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
-    },
-    {
-      "name": "RelWithDebInfo",
-      "inherits": [ "base" ],
-      "displayName": "RelWithDebInfo",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" }
     }
   ]
