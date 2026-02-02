@@ -1,0 +1,82 @@
+#include "PCH.h"
+#include "attackhandler.h"
+#include "settings.h"
+
+using namespace SKSE;
+using namespace SKSE::log;
+using namespace SKSE::stl;
+
+namespace MSCO {
+    //using ProcessButton_t = void (RE::AttackBlockHandler::*)(RE::ButtonEvent*, RE::PlayerControlsData*);
+    //store the original pointer as we're going to return if we don't use it so another mod that hooks into same thing doesn't blow up
+    //REL::Relocation<ProcessButton_t> g_originalProcessButton;
+    //static REL::Relocation<ProcessButton_t> _ProcessButton;
+    using ProcessButton_t = void (*)(RE::AttackBlockHandler*, RE::ButtonEvent*, RE::PlayerControlsData*);
+    static inline ProcessButton_t _ProcessButton = nullptr;
+    
+    static void Hook_ProcessButton(RE::AttackBlockHandler* self, RE::ButtonEvent* ev, RE::PlayerControlsData* data) {
+        if (!self || !ev || !data || !_ProcessButton) {
+            log::warn("[ABHook]: missing self/ev/data/_ProcessButton");
+            return;
+        }
+        if (!settings::IsPlayerAllowed()) {
+            if (_ProcessButton) {
+                if (settings::IsLogEnabled()) log::info("[ABHook] MSCO not enabled for player, ignore");
+                _ProcessButton(self, ev, data);
+            }
+            return;
+        }
+        bool swallow = false;
+        // basically, early return the left/right input if MSCO_right_lock == 1/MSCO_left_lock == 1
+        if (ev && ev->IsDown() && ev->HeldDuration() <= 0.0f) {
+            const char* s = ev->QUserEvent().c_str();
+
+            if (s) {
+                auto* player = RE::PlayerCharacter::GetSingleton();
+                if (player) {
+                    using m_state = RE::MagicCaster::State;
+                    int lock = 0;
+                    bool ok = false;
+                    bool castingActive = false;
+                    if (std::strcmp(s, "Left Attack/Block") == 0) {
+                        ok = player->GetGraphVariableInt("MSCO_left_lock", lock);
+                        //log::info("[ABHook] {} ok={} lock={}", s, ok, lock);
+                        if (auto* playerCaster = player->GetMagicCaster(RE::MagicSystem::CastingSource::kLeftHand)) {
+                            const auto lstate = playerCaster->state.get();
+                            if (lstate >= m_state::kUnk02 && lstate <= m_state::kUnk04) {
+                                castingActive = true;
+                            }
+                        }
+                    } else if (std::strcmp(s, "Right Attack/Block") == 0) {
+                        ok = player->GetGraphVariableInt("MSCO_right_lock", lock);
+                        //log::info("[ABHook] {} ok={} lock={}", s, ok, lock);
+                        if (auto* playerCaster = player->GetMagicCaster(RE::MagicSystem::CastingSource::kRightHand)) {
+                            const auto rstate = playerCaster->state.get();
+                            if (rstate >= m_state::kUnk02 && rstate <= m_state::kUnk04) {
+                                castingActive = true;
+                            }
+                        }
+                    }
+                    swallow = ((ok && lock != 0) || castingActive);
+                    if (swallow) {  
+                        if (settings::IsLogEnabled()) log::info("[ABHook] Swallowed {}", s);
+                        return;
+                    }
+                }
+            }
+        }
+
+        // forward if we don't do anything so other mods/thigns works just fine
+        if (_ProcessButton) {
+            _ProcessButton(self, ev, data);
+        }
+    }
+
+    void AttackBlockHook::Install() {
+        REL::Relocation<std::uintptr_t> vtbl{RE::VTABLE_AttackBlockHandler[0]};
+        //return original vfunc address? 
+        const std::uintptr_t orig = vtbl.write_vfunc(0x4, &Hook_ProcessButton);
+        // convert raw address -> function pointer
+        _ProcessButton = reinterpret_cast<ProcessButton_t>(orig);
+    }
+}
