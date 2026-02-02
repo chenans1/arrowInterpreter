@@ -4,6 +4,10 @@ cmake_minimum_required(VERSION 3.21)
 
 # Set your project name. This will be the name of your SKSE .dll file.
 project(PLUGINNAME VERSION 0.0.1 LANGUAGES CXX)
+
+add_subdirectory(extern/CommonLibVR-ng)
+include(extern/CommonLibVR-ng/cmake/CommonLibSSE.cmake)
+
 include("C:/SKSEdev/repos/CommonLibVR-NG/cmake/CommonLibSSE.cmake")
 set(BUILD_TESTS OFF CACHE BOOL "Build unit tests for CommonLibVR." FORCE)
 set(ENABLE_SKYRIM_VR OFF CACHE BOOL "" FORCE)
@@ -14,17 +18,15 @@ set(OUTPUT_FOLDER "C:/SKSEdev/output/")
 # find_package(CommonLibSSE CONFIG REQUIRED)
 
 set(SOURCES
-    src/plugin.cpp
-    src/utils.cpp)
+    src/plugin.cpp)
 
 # add_subdirectory("C:/SKSEdev/repos/template_test/extern/CommonLibVR-NG")
-add_subdirectory(extern/CommonLibVR-ng)
+# add_subdirectory(extern/CommonLibVR-ng)
 add_commonlibsse_plugin(${PROJECT_NAME} SOURCES ${SOURCES}) # <--- specifies plugin.cpp
 
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23) # <--- use C++23 standard
 target_precompile_headers(${PROJECT_NAME} PRIVATE 
-    src/PCH.h
-    src/utils.h) 
+    src/PCH.h) 
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/extern
