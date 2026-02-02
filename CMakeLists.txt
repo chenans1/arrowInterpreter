@@ -2,34 +2,34 @@
 # If you use CMake features from higher versions, update this to match.
 cmake_minimum_required(VERSION 3.21)
 
+#global test options
+set(BUILD_TESTS OFF CACHE BOOL "Build unit tests for CommonLibVR." FORCE)
+set(ENABLE_SKYRIM_VR OFF CACHE BOOL "" FORCE)
+
 # Set your project name. This will be the name of your SKSE .dll file.
 project(PLUGINNAME VERSION 0.0.1 LANGUAGES CXX)
+
+set(OUTPUT_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/output")
 
 add_subdirectory(extern/CommonLibVR-ng)
 include(extern/CommonLibVR-ng/cmake/CommonLibSSE.cmake)
 
-set(BUILD_TESTS OFF CACHE BOOL "Build unit tests for CommonLibVR." FORCE)
-set(ENABLE_SKYRIM_VR OFF CACHE BOOL "" FORCE)
-
-
-#set(OUTPUT_FOLDER "C:/SKSEdev/output/")
-set(OUTPUT_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/output")
 # Setup your SKSE plugin as an SKSE plugin!
 # find_package(CommonLibSSE CONFIG REQUIRED)
 
 set(SOURCES
-    src/plugin.cpp)
+    src/plugin.cpp
+)
 
-# add_subdirectory("C:/SKSEdev/repos/template_test/extern/CommonLibVR-NG")
-# add_subdirectory(extern/CommonLibVR-ng)
 add_commonlibsse_plugin(${PROJECT_NAME} SOURCES ${SOURCES}) # <--- specifies plugin.cpp
 
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23) # <--- use C++23 standard
 target_precompile_headers(${PROJECT_NAME} PRIVATE 
-    src/PCH.h) 
+    src/PCH.h
+) 
 
 target_include_directories(${PROJECT_NAME} PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/extern
+    ${CMAKE_CURRENT_SOURCE_DIR}/extern/SimpleIni.h
 )
 
 # When your SKSE .dll is compiled, this will automatically copy the .dll into your mods folder.
