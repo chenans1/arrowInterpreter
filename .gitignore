@@ -4,7 +4,4 @@
 build
 cmake-build*
 /extern/CommonLibVR-NG
-Ids and stuff.txt
-SpellCast().txt
-finishCast().txt
 extern/SKSEMenuFramework.h
