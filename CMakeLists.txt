@@ -3,23 +3,18 @@
 cmake_minimum_required(VERSION 3.21)
 
 # Set your project name. This will be the name of your SKSE .dll file.
-project(MSCO VERSION 2.0.0 LANGUAGES CXX)
+project(PLUGINNAME VERSION 0.0.1 LANGUAGES CXX)
 include("C:/SKSEdev/repos/CommonLibVR-NG/cmake/CommonLibSSE.cmake")
 set(BUILD_TESTS OFF CACHE BOOL "Build unit tests for CommonLibVR." FORCE)
 set(ENABLE_SKYRIM_VR OFF CACHE BOOL "" FORCE)
 
 
-set(OUTPUT_FOLDER "D:/Skyrim SE MO2/mods/MSCO")
+set(OUTPUT_FOLDER "C:/SKSEdev/output/")
 # Setup your SKSE plugin as an SKSE plugin!
 # find_package(CommonLibSSE CONFIG REQUIRED)
 
 set(SOURCES
     src/plugin.cpp
-    src/magichandler.cpp
-    src/attackhandler.cpp
-    src/AnimEventFramework.cpp
-    src/payloadhandler.cpp
-    src/settings.cpp
     src/utils.cpp)
 
 # add_subdirectory("C:/SKSEdev/repos/template_test/extern/CommonLibVR-NG")
@@ -29,11 +24,6 @@ add_commonlibsse_plugin(${PROJECT_NAME} SOURCES ${SOURCES}) # <--- specifies plu
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23) # <--- use C++23 standard
 target_precompile_headers(${PROJECT_NAME} PRIVATE 
     src/PCH.h
-    src/magichandler.h
-    src/attackhandler.h
-    src/AnimEventFramework.h
-    src/payloadhandler.h
-    src/settings.h
     src/utils.h) 
 
 target_include_directories(${PROJECT_NAME} PRIVATE
