@@ -3,9 +3,6 @@
 #include <Windows.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/msvc_sink.h>
-#include "attackhandler.h"
-#include "AnimEventFramework.h"
-#include "settings.h"
 
 using namespace SKSE;
 using namespace SKSE::log;
@@ -38,42 +35,14 @@ namespace {
         loggerPtr->flush_on(spdlog::level::info);
         spdlog::set_default_logger(std::move(loggerPtr));
     }
-
-    /*void InitializeEventSink() {
-        GetMessagingInterface()->RegisterListener([](MessagingInterface::Message* message) {
-            switch (message->type) {
-                case SKSE::MessagingInterface::kPostLoadGame: {
-                    auto* eventSource = RE::ScriptEventSourceHolder::GetSingleton();
-                    if (eventSource) {
-                        eventSource->AddEventSink<RE::TESSpellCastEvent>(MSCO::SpellCastEventHandler::GetSingleton());
-                        log::info("Registered SpellCastEventHandler");
-                    } else {
-                        log::warn("Failed to get ScriptEventSourceHolder for SpellCastEventHandler");
-                    }
-                    break;
-                }
-                default:
-                    break;
-            }
-        });
-    }*/
 }
 SKSEPluginLoad(const SKSE::LoadInterface* skse) {
     initialize_log();
     auto* plugin = PluginDeclaration::GetSingleton();
     auto version = plugin->GetVersion();
     log::info("{} {} is loading...", plugin->GetName(), version);
-
     SKSE::Init(skse);
-    MSCO::AttackBlockHook::Install();
-    log::info("Installed AttackBlockHandler::ProcessButton hook");
-    MSCO::AnimEventHook::Install();
 
-    MSCO::Magic::Install();
-    log::info("Installed Magic::RequestCastImpl hook");
-    settings::RegisterMenu();
-    settings::load();
-    //InitializeEventSink();
     log::info("{} has finished loading.", plugin->GetName());
     return true;
 }
