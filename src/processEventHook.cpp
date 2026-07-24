@@ -19,6 +19,45 @@ namespace arrow {
         log::info("[processEventHook] ...ProcessEvent hook installed");
     }
 
+    static bool releaseArrow(RE::TESAmmo* ammo, RE::TESObjectWEAP* weapon, RE::Actor* actor) {
+        if (!ammo || !weapon || !actor) {
+            log::info("[arrowInterpreter] invalid params for releaseArrow()");
+            return false;
+        }
+
+        auto* currentProcess = actor->GetActorRuntimeData().currentProcess;
+        if (!currentProcess) {
+            log::warn("[arrowInterpreter] Actor {:08X} has no current process", actor->GetFormID());
+            return false;
+        }
+
+        auto* weaponNode = currentProcess->GetWeaponNode(actor->GetBiped2());
+        if (!weaponNode) {
+            log::warn("[arrowInterpreter] Actor {:08X} has no weapon node", actor->GetFormID());
+            return false;
+        }
+
+        RE::ProjectileHandle handle;
+        RE::Projectile::LaunchArrow(&handle, actor, ammo, weapon);
+        auto projectile = handle.get();
+        if (!projectile) {
+            log::error("[arrowInterpreter] Failed to launch arrow for actor {:08X}", actor->GetFormID());
+            return false;
+        }
+        auto& projectileData = projectile->GetProjectileRuntimeData();
+        if (projectileData.power > 0.0f) {
+            projectileData.weaponDamage /= projectileData.power;
+            projectileData.power = 1.0f;
+            projectileData.weaponDamage *= projectileData.power;
+        }
+
+        log::info(
+            "[arrowInterpreter] After correction: "
+            "power={}, weaponDamage={}, speedMult={}",
+            projectileData.power, projectileData.weaponDamage, projectileData.speedMult);
+        return true;
+    }
+
     //checks if it's out tag
     static void HandleEvent(RE::BSAnimationGraphEvent* a_event) {
         if (!a_event || !a_event->holder || !a_event->tag.data()) return;
@@ -45,8 +84,9 @@ namespace arrow {
             log::info("[arrowInterpreter] Actor {:08X} has no ammunition equipped", actor->GetFormID());
             return;
         }
-        RE::ProjectileHandle handle{};
-        RE::Projectile::LaunchArrow(std::addressof(handle), actor, ammo, bow);
+        //launch an arrow
+        releaseArrow(ammo, bow, actor);
+
     }
 
     RE::BSEventNotifyControl ProcessEventHook::ProcessEvent_NPC(
