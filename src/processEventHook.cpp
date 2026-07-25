@@ -19,7 +19,7 @@ namespace arrow {
         log::info("[processEventHook] ...ProcessEvent hook installed");
     }
 
-    static bool releaseArrow(RE::TESAmmo* ammo, RE::TESObjectWEAP* weapon, RE::Actor* actor) {
+    static bool releaseArrow(RE::TESAmmo* ammo, RE::TESObjectWEAP* weapon, RE::Actor* actor, float damageMult = 0.0f) {
         if (!ammo || !weapon || !actor) {
             log::info("[arrowInterpreter] invalid params for releaseArrow()");
             return false;
@@ -31,18 +31,6 @@ namespace arrow {
             return false;
         }
 
-        //auto* weaponNode = currentProcess->GetWeaponNode(actor->GetBiped2());
-        //if (!weaponNode) {
-        //    log::warn("[arrowInterpreter] Actor {:08X} has no weapon node", actor->GetFormID());
-        //    return false;
-        //}
-
-        //auto* fireNode = actor->GetFireNode();
-        //if (!fireNode) {
-        //    log::warn("[arrowInterpreter] Actor {:08X} has no fireNode", actor->GetFormID());
-        //    return false;
-        //}
-
         //RE::NiPoint3 origin = fireNode->world.translate;
         RE::NiPoint3 origin = actor->GetPosition();
         origin.z += 96.0f;
@@ -52,10 +40,10 @@ namespace arrow {
         rotation.x = actor->GetAimAngle();
         rotation.z = actor->GetAimHeading();
 
-        log::info(
-            "[arrowInterpreter] Launch transform: "
-            "origin=({}, {}, {}), pitch={}, yaw={}",
-            origin.x, origin.y, origin.z, rotation.x, rotation.z);
+        //log::info(
+        //    "[arrowInterpreter] Launch transform: "
+        //    "origin=({}, {}, {}), pitch={}, yaw={}",
+        //    origin.x, origin.y, origin.z, rotation.x, rotation.z);
 
         RE::ProjectileHandle handle;
         RE::Projectile::LaunchArrow(&handle, actor, ammo, weapon, origin, rotation);
@@ -70,14 +58,39 @@ namespace arrow {
         if (projectileData.power > 0.0f) {
             projectileData.weaponDamage /= projectileData.power;
             projectileData.power = 1.0f;
-            projectileData.weaponDamage *= projectileData.power;
+            projectileData.weaponDamage *= damageMult;
         }
 
-        //log::info(
-        //    "[arrowInterpreter] After correction: "
-        //    "power={}, weaponDamage={}, speedMult={}",
-        //    projectileData.power, projectileData.weaponDamage, projectileData.speedMult);
+        log::info(
+            "[arrowInterpreter] After correction: "
+            "power={}, weaponDamage={}",
+            projectileData.power, projectileData.weaponDamage);
         return true;
+    }
+
+    //process stringview into float basic implementation for testing
+    static float parse(std::string_view payload, float defaultValue = 1.0f) {
+        constexpr std::string_view prefix = "dmg=";
+        if (!payload.starts_with(prefix)) {
+            return defaultValue;
+        }
+        payload.remove_prefix(prefix.size());
+
+        if (payload.empty()) {
+            return defaultValue;
+        }
+
+        float value = defaultValue;
+
+        const char* begin = payload.data();
+        const char* end = begin + payload.size();
+
+        const auto [ptr, error] = std::from_chars(begin, end, value);
+        if (error != std::errc{} || ptr != end) {
+            return defaultValue;
+        }
+
+        return value;
     }
 
     //checks if it's out tag
@@ -106,8 +119,15 @@ namespace arrow {
             log::info("[arrowInterpreter] Actor {:08X} has no ammunition equipped", actor->GetFormID());
             return;
         }
+
+        //process payload now 
+        //going with format is like dmg=float|count=int{1, 15}|spread=float{0, 360}
+        //eg: arrowinterpreter.dmg=0.5|count=3|spread=45.0
         //launch an arrow
-        releaseArrow(ammo, bow, actor);
+        float mult = parse(payload);
+        if (releaseArrow(ammo, bow, actor, mult)) {
+            actor->UseAmmo(1);
+        }
 
     }
 
