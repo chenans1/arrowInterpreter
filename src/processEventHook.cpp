@@ -31,19 +31,41 @@ namespace arrow {
             return false;
         }
 
-        auto* weaponNode = currentProcess->GetWeaponNode(actor->GetBiped2());
-        if (!weaponNode) {
-            log::warn("[arrowInterpreter] Actor {:08X} has no weapon node", actor->GetFormID());
-            return false;
-        }
+        //auto* weaponNode = currentProcess->GetWeaponNode(actor->GetBiped2());
+        //if (!weaponNode) {
+        //    log::warn("[arrowInterpreter] Actor {:08X} has no weapon node", actor->GetFormID());
+        //    return false;
+        //}
+
+        //auto* fireNode = actor->GetFireNode();
+        //if (!fireNode) {
+        //    log::warn("[arrowInterpreter] Actor {:08X} has no fireNode", actor->GetFormID());
+        //    return false;
+        //}
+
+        //RE::NiPoint3 origin = fireNode->world.translate;
+        RE::NiPoint3 origin = actor->GetPosition();
+        origin.z += 96.0f;
+        //RE::NiPoint3 origin = weaponNode->world.translate;
+        RE::Projectile::ProjectileRot rotation{};
+
+        rotation.x = actor->GetAimAngle();
+        rotation.z = actor->GetAimHeading();
+
+        log::info(
+            "[arrowInterpreter] Launch transform: "
+            "origin=({}, {}, {}), pitch={}, yaw={}",
+            origin.x, origin.y, origin.z, rotation.x, rotation.z);
 
         RE::ProjectileHandle handle;
-        RE::Projectile::LaunchArrow(&handle, actor, ammo, weapon);
+        RE::Projectile::LaunchArrow(&handle, actor, ammo, weapon, origin, rotation);
+
         auto projectile = handle.get();
         if (!projectile) {
             log::error("[arrowInterpreter] Failed to launch arrow for actor {:08X}", actor->GetFormID());
             return false;
         }
+
         auto& projectileData = projectile->GetProjectileRuntimeData();
         if (projectileData.power > 0.0f) {
             projectileData.weaponDamage /= projectileData.power;
@@ -51,10 +73,10 @@ namespace arrow {
             projectileData.weaponDamage *= projectileData.power;
         }
 
-        log::info(
-            "[arrowInterpreter] After correction: "
-            "power={}, weaponDamage={}, speedMult={}",
-            projectileData.power, projectileData.weaponDamage, projectileData.speedMult);
+        //log::info(
+        //    "[arrowInterpreter] After correction: "
+        //    "power={}, weaponDamage={}, speedMult={}",
+        //    projectileData.power, projectileData.weaponDamage, projectileData.speedMult);
         return true;
     }
 
