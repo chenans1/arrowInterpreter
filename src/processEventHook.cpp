@@ -19,7 +19,7 @@ namespace arrow {
         log::info("[processEventHook] ...ProcessEvent hook installed");
     }
 
-    static bool releaseArrow(RE::TESAmmo* ammo, RE::TESObjectWEAP* weapon, RE::Actor* actor, float damageMult = 0.0f) {
+    static bool releaseArrow(RE::TESAmmo* ammo, RE::TESObjectWEAP* weapon, RE::Actor* actor, float damageMult = 1.0f) {
         if (!ammo || !weapon || !actor) {
             log::info("[arrowInterpreter] invalid params for releaseArrow()");
             return false;
