@@ -46,16 +46,16 @@ namespace draugr {
         "SCAR_DraugrPA",
     };
 
-    // output targets
-
     struct AttackTargets {
-        std::string_view normal;
-        std::string_view power;
+        RE::BSFixedString normal;
+        RE::BSFixedString power;
     };
-    //final rerouted animevents
-    static constexpr AttackTargets k1HM{"attackStart1HMSwipe", "attackStart1HMPowerSlash"};
-    static constexpr AttackTargets k2HM{"attackStartGSChop", "attackStartGSForwardPowerB"};
-    static constexpr AttackTargets k2HW{"attackStart2HMSlash","attackStart2HMPowerChop"};
+
+    static const AttackTargets k1HM{"attackStart1HMSwipe", "attackStart1HMPowerSlash"};
+
+    static const AttackTargets k2HM{"attackStartGSChop", "attackStartGSForwardPowerB"};
+
+    static const AttackTargets k2HW{"attackStart2HMSlash", "attackStart2HMPowerChop"};
 
     static DraugrWeaponClass GetWeaponClass(RE::Actor* actor) {
         if (!actor) {
@@ -94,33 +94,25 @@ namespace draugr {
         }
     }
 
-    static std::string_view GetReroutedEvent(DraugrWeaponClass weaponClass, bool powerAttack) {
-        const AttackTargets* targets = nullptr;
-
-        switch (weaponClass) {
+    static const RE::BSFixedString* GetReroutedEvent(DraugrWeaponClass a_weaponClass, bool a_powerAttack) {
+        switch (a_weaponClass) {
             case DraugrWeaponClass::kOneHanded:
-                targets = &k1HM;
-                break;
+                return a_powerAttack ? &k1HM.power : &k1HM.normal;
 
             case DraugrWeaponClass::kGreatsword:
-                targets = &k2HM;
-                break;
+                return a_powerAttack ? &k2HM.power : &k2HM.normal;
 
             case DraugrWeaponClass::kTwoHanded:
-                targets = &k2HW;
-                break;
+                return a_powerAttack ? &k2HW.power : &k2HW.normal;
 
             default:
-                return {};
+                return nullptr;
         }
-
-        return powerAttack ? targets->power : targets->normal;
     }
-
     bool ProcessEventHook::NotifyAnimationGraph_NPC(
         RE::IAnimationGraphManagerHolder* a_this,const RE::BSFixedString& a_eventName) {
         if (!a_this) {
-            log::info("[DraugrAttackReroute] no a_this");
+            //log::info("[DraugrAttackReroute] no a_this");
             return _originalNPC(a_this, a_eventName);
         }
         const std::string_view tag{a_eventName.c_str()};
@@ -137,14 +129,14 @@ namespace draugr {
         auto* refr = SKSE::stl::adjust_pointer<RE::TESObjectREFR>(a_this, -0x38);
 
         if (!refr) {
-            log::info("[DraugrAttackReroute] ref pointer substraction failed");
+            //log::info("[DraugrAttackReroute] ref pointer substraction failed");
             return _originalNPC(a_this, a_eventName);
         }
 
         auto* actor = refr->As<RE::Actor>();
 
         if (!actor) {
-            log::info("[DraugrAttackReroute] no actor");
+            //log::info("[DraugrAttackReroute] no actor");
             return _originalNPC(a_this, a_eventName);
         }
 
@@ -153,15 +145,20 @@ namespace draugr {
         if (weaponClass == DraugrWeaponClass::kUnknown) {
             return _originalNPC(a_this, a_eventName);
         }
-        const auto reroutedEvent = GetReroutedEvent(weaponClass, isPowerAttack);
 
-        if (reroutedEvent.empty()) {
-            log::info("[DraugrAttackReroute] N/A AnimEvent={}", tag);
+        const auto* reroutedEvent = GetReroutedEvent(weaponClass, isPowerAttack);
+
+        if (!reroutedEvent) {
             return _originalNPC(a_this, a_eventName);
         }
-        log::info("[DraugrAttackReroute] Actor={} Event={} -> {}", actor->GetName(), tag, reroutedEvent);
-        const RE::BSFixedString replacement{reroutedEvent.data()};
-        return _originalNPC(a_this, replacement);
+
+        if (a_eventName == *reroutedEvent) {
+            return _originalNPC(a_this, a_eventName);
+        }
+
+        //log::info("[DraugrAttackReroute] Actor={} Event={} -> {}", actor->GetName(), a_eventName.c_str(), reroutedEvent->c_str());
+
+        return _originalNPC(a_this, *reroutedEvent);
     }
 
     void ProcessEventHook::Install() {
