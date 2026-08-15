@@ -44,7 +44,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* skse) {
     auto version = plugin->GetVersion();
     log::info("{} {} is loading...", plugin->GetName(), version);
     SKSE::Init(skse);
-    arrow::ProcessEventHook::Install();
+    draugr::ProcessEventHook::Install();
     log::info("{} has finished loading.", plugin->GetName());
     return true;
 }

@@ -1,54 +1,171 @@
 #include "PCH.h"
 #include "processEventHook.h"
+#include <unordered_set>
 
 using namespace SKSE;
 using namespace SKSE::log;
 using namespace std::literals;
 
-namespace arrow {
-    //doing npcs and pcs
-    void ProcessEventHook::Install() { 
-        log::info("[processEventHook] Install ProcessEvent() Hook");
+//REL::Relocation<uintptr_t> AnimEventVtbl_NPC{RE::VTABLE_Character[2]};
+//_ProcessEvent = AnimEventVtbl_NPC.write_vfunc(0x1, ProcessEvent);
 
-        REL::Relocation<std::uintptr_t> vtblNPC{RE::VTABLE_Character[2]};
-        REL::Relocation<std::uintptr_t> vtblPC{RE::VTABLE_PlayerCharacter[2]};
+namespace draugr {
 
-        _originalNPC = vtblNPC.write_vfunc(0x1, ProcessEvent_NPC);
-        _originalPC = vtblPC.write_vfunc(0x1, ProcessEvent_PC);
+    enum class DraugrWeaponClass { kUnknown, kOneHanded, kGreatsword, kTwoHanded };
 
-        log::info("[processEventHook] ...ProcessEvent hook installed");
+    //checked from the draugr Race Record
+    static const std::unordered_set<std::string_view> kNormalAttacks{
+        "attackStart1HMSwipe",
+        "attackStart1HMBackSlash",
+        "attackStart1HMX2",
+        "attackStartGSBackSlash", 
+        "attackStartGSChop",          
+        "attackStartGSX2",
+        "attackStart2HMSlash", 
+        "attackStart2HMForwardSwipe", 
+        "attackStart2HMBackSwipe",
+
+        // Hand to Hand (to be implemented)
+        // "attackStartH2HLeft",
+        // "attackStartH2HRight",
+    };
+
+    static const std::unordered_set<std::string_view> kPowerAttacks{
+        "attackStart1HMPowerChop",       
+        "attackStart1HMForwardPower", 
+        "attackStart1HMPowerSlash",
+
+        "attackStartGSForwardPowerB",
+
+        "attackStart2HMForwardPowerChop", 
+        "attackStart2HMPowerChop",
+    };
+
+    // output targets
+
+    struct AttackTargets {
+        std::string_view normal;
+        std::string_view power;
+    };
+    //final rerouted animevents
+    static constexpr AttackTargets k1HM{"attackStart1HMSwipe", "attackStart1HMPowerSlash"};
+    static constexpr AttackTargets k2HM{"attackStartGSChop", "attackStartGSForwardPowerB"};
+    static constexpr AttackTargets k2HW{"attackStart2HMSlash","attackStart2HMForwardPowerChop"};
+
+    static DraugrWeaponClass GetWeaponClass(RE::Actor* actor) {
+        if (!actor) {
+            return DraugrWeaponClass::kUnknown;
+        }
+
+        // false = right hand
+        auto* equipped = actor->GetEquippedObject(false);
+
+        if (!equipped) {
+            return DraugrWeaponClass::kUnknown;
+        }
+
+        auto* weapon = equipped->As<RE::TESObjectWEAP>();
+
+        if (!weapon) {
+            return DraugrWeaponClass::kUnknown;
+        }
+
+        switch (weapon->GetWeaponType()) {
+            case RE::WEAPON_TYPE::kOneHandSword:
+            case RE::WEAPON_TYPE::kOneHandDagger:
+            case RE::WEAPON_TYPE::kOneHandAxe:
+            case RE::WEAPON_TYPE::kOneHandMace:
+                return DraugrWeaponClass::kOneHanded;
+
+            case RE::WEAPON_TYPE::kTwoHandSword:
+                return DraugrWeaponClass::kGreatsword;
+
+            case RE::WEAPON_TYPE::kTwoHandAxe:
+                // Skyrim uses this category for the 2H axe/hammer family.
+                return DraugrWeaponClass::kTwoHanded;
+
+            default:
+                return DraugrWeaponClass::kUnknown;
+        }
     }
 
-    //checks if it's our tag
-    static void HandleEvent(RE::BSAnimationGraphEvent* a_event) {
-        if (!a_event || !a_event->holder || !a_event->tag.data()) return;
-        auto* holder = const_cast<RE::TESObjectREFR*>(a_event->holder);
-        if (!holder) return;
-        auto* actor = holder ? holder->As<RE::Actor>() : nullptr;
-        if (!actor) return;
+    static std::string_view GetReroutedEvent(DraugrWeaponClass weaponClass, bool powerAttack) {
+        const AttackTargets* targets = nullptr;
 
-        const auto& tag = a_event->tag;
-        //const auto& payload = a_event->payload;
+        switch (weaponClass) {
+            case DraugrWeaponClass::kOneHanded:
+                targets = &k1HM;
+                break;
 
+            case DraugrWeaponClass::kGreatsword:
+                targets = &k2HM;
+                break;
 
+            case DraugrWeaponClass::kTwoHanded:
+                targets = &k2HW;
+                break;
+
+            default:
+                return {};
+        }
+
+        return powerAttack ? targets->power : targets->normal;
     }
 
-    RE::BSEventNotifyControl ProcessEventHook::ProcessEvent_NPC(
-        RE::BSTEventSink<RE::BSAnimationGraphEvent>* a_sink, 
-        RE::BSAnimationGraphEvent* a_event,
-        RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_eventSource) 
-    {
-        HandleEvent(a_event);
-        return _originalNPC(a_sink, a_event, a_eventSource);
+    bool ProcessEventHook::NotifyAnimationGraph_NPC(
+        RE::IAnimationGraphManagerHolder* a_this,const RE::BSFixedString& a_eventName) {
+        if (!a_this) {
+            log::info("[DraugrAttackReroute] no a_this");
+            return _originalNPC(a_this, a_eventName);
+        }
+        const std::string_view tag{a_eventName.c_str()};
+
+        bool isPowerAttack = false;
+        if (kNormalAttacks.contains(tag)) {
+            isPowerAttack = false;
+        } else if (kPowerAttacks.contains(tag)) {
+            isPowerAttack = true;
+        } else {
+            return _originalNPC(a_this, a_eventName);
+        }
+
+        auto* refr = SKSE::stl::adjust_pointer<RE::TESObjectREFR>(a_this, -0x38);
+
+        if (!refr) {
+            log::info("[DraugrAttackReroute] ref pointer substraction failed");
+            return _originalNPC(a_this, a_eventName);
+        }
+
+        auto* actor = refr->As<RE::Actor>();
+
+        if (!actor) {
+            log::info("[DraugrAttackReroute] no actor");
+            return _originalNPC(a_this, a_eventName);
+        }
+
+        const auto weaponClass = GetWeaponClass(actor);
+
+        if (weaponClass == DraugrWeaponClass::kUnknown) {
+            return _originalNPC(a_this, a_eventName);
+        }
+        const auto reroutedEvent = GetReroutedEvent(weaponClass, isPowerAttack);
+
+        if (reroutedEvent.empty()) {
+            log::info("[DraugrAttackReroute] N/A AnimEvent={}", tag);
+            return _originalNPC(a_this, a_eventName);
+        }
+        log::info("[DraugrAttackReroute] Actor={} Event={} -> {}", actor->GetName(), tag, reroutedEvent);
+        const RE::BSFixedString replacement{reroutedEvent.data()};
+        return _originalNPC(a_this, replacement);
     }
 
-    RE::BSEventNotifyControl ProcessEventHook::ProcessEvent_PC(
-        RE::BSTEventSink<RE::BSAnimationGraphEvent>* a_sink,
-        RE::BSAnimationGraphEvent* a_event,
-        RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_eventSource) 
-    {
-        HandleEvent(a_event);
-        return _originalPC(a_sink, a_event, a_eventSource);
-    }
+    void ProcessEventHook::Install() {
+        log::info("[NotifyAnimationGraphHook] Installing Character hook");
 
+        REL::Relocation<std::uintptr_t> vtblNPC{RE::VTABLE_Character[3]};
+
+        _originalNPC = vtblNPC.write_vfunc(0x1, NotifyAnimationGraph_NPC);
+
+        log::info("[NotifyAnimationGraphHook] Character hook installed");
+    }
 }
