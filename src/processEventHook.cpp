@@ -6,14 +6,61 @@ using namespace SKSE;
 using namespace SKSE::log;
 using namespace std::literals;
 
-//REL::Relocation<uintptr_t> AnimEventVtbl_NPC{RE::VTABLE_Character[2]};
-//_ProcessEvent = AnimEventVtbl_NPC.write_vfunc(0x1, ProcessEvent);
-
 namespace draugr {
+    //checks to see if the race has draugr behaviors
+    static bool ContainsDraugr(std::string_view str) {
+        constexpr std::string_view target = "draugr";
+
+        if (str.size() < target.size()) {
+            return false;
+        }
+
+        for (std::size_t i = 0; i <= str.size() - target.size(); ++i) {
+            bool match = true;
+
+            for (std::size_t j = 0; j < target.size(); ++j) {
+                const auto c = static_cast<unsigned char>(str[i + j]);
+
+                if (std::tolower(c) != target[j]) {
+                    match = false;
+                    break;
+                }
+            }
+
+            if (match) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    static bool IsDraugrBehavior(RE::Actor* actor) {
+        if (!actor) {
+            return false;
+        }
+
+        auto* race = actor->GetRace();
+        auto* actorBase = actor->GetActorBase();
+
+        if (!race || !actorBase) {
+            return false;
+        }
+
+        const auto sex = actorBase->GetSex();
+
+        const char* projectName = race->behaviorGraphProjectNames[sex].c_str();
+
+        if (!projectName || !*projectName) {
+            return false;
+        }
+
+        return ContainsDraugr(projectName);
+    }
 
     enum class DraugrWeaponClass { kUnknown, kOneHanded, kGreatsword, kTwoHanded };
 
-    //checked from the draugr Race Record
+    //checked from the draugr Race Record. attackstart and attackpowerstartinplace were added to handle SCAR 2.0 attackdata functionality
     static const std::unordered_set<std::string_view> kNormalAttacks{
         //"attackStart1HMSwipe",
         "attackStart1HMBackSlash",
@@ -31,7 +78,8 @@ namespace draugr {
         // "attackStartH2HLeft",
         // "attackStartH2HRight",
 
-        "SCAR_DraugrNA",
+        "SCAR_DraugrNA", 
+        "attackStart",
     };
 
     static const std::unordered_set<std::string_view> kPowerAttacks{
@@ -43,7 +91,8 @@ namespace draugr {
 
         "attackStart2HMForwardPowerChop", 
         //"attackStart2HMPowerChop",
-        "SCAR_DraugrPA",
+        "SCAR_DraugrPA", 
+        "attackPowerStartInPlace",
     };
 
     struct AttackTargets {
@@ -86,7 +135,6 @@ namespace draugr {
                 return DraugrWeaponClass::kGreatsword;
 
             case RE::WEAPON_TYPE::kTwoHandAxe:
-                // Skyrim uses this category for the 2H axe/hammer family.
                 return DraugrWeaponClass::kTwoHanded;
 
             default:
@@ -129,7 +177,6 @@ namespace draugr {
         auto* refr = SKSE::stl::adjust_pointer<RE::TESObjectREFR>(a_this, -0x38);
 
         if (!refr) {
-            //log::info("[DraugrAttackReroute] ref pointer substraction failed");
             return _originalNPC(a_this, a_eventName);
         }
 
@@ -137,6 +184,11 @@ namespace draugr {
 
         if (!actor) {
             //log::info("[DraugrAttackReroute] no actor");
+            return _originalNPC(a_this, a_eventName);
+        }
+
+        //needed due to attackStart/attackPowerStart being used across humanoid and draugrs
+        if (!IsDraugrBehavior(actor)) {
             return _originalNPC(a_this, a_eventName);
         }
 
