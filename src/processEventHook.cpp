@@ -15,30 +15,35 @@ namespace draugr {
 
     //checked from the draugr Race Record
     static const std::unordered_set<std::string_view> kNormalAttacks{
-        "attackStart1HMSwipe",
+        //"attackStart1HMSwipe",
         "attackStart1HMBackSlash",
         "attackStart1HMX2",
+
         "attackStartGSBackSlash", 
-        "attackStartGSChop",          
+        //"attackStartGSChop",          
         "attackStartGSX2",
-        "attackStart2HMSlash", 
+
+        //"attackStart2HMSlash", 
         "attackStart2HMForwardSwipe", 
         "attackStart2HMBackSwipe",
 
         // Hand to Hand (to be implemented)
         // "attackStartH2HLeft",
         // "attackStartH2HRight",
+
+        "SCAR_DraugrNA",
     };
 
     static const std::unordered_set<std::string_view> kPowerAttacks{
         "attackStart1HMPowerChop",       
         "attackStart1HMForwardPower", 
-        "attackStart1HMPowerSlash",
-
-        "attackStartGSForwardPowerB",
+        //"attackStart1HMPowerSlash",
+        
+        //"attackStartGSForwardPowerB",
 
         "attackStart2HMForwardPowerChop", 
-        "attackStart2HMPowerChop",
+        //"attackStart2HMPowerChop",
+        "SCAR_DraugrPA",
     };
 
     // output targets
@@ -50,7 +55,7 @@ namespace draugr {
     //final rerouted animevents
     static constexpr AttackTargets k1HM{"attackStart1HMSwipe", "attackStart1HMPowerSlash"};
     static constexpr AttackTargets k2HM{"attackStartGSChop", "attackStartGSForwardPowerB"};
-    static constexpr AttackTargets k2HW{"attackStart2HMSlash","attackStart2HMForwardPowerChop"};
+    static constexpr AttackTargets k2HW{"attackStart2HMSlash","attackStart2HMPowerChop"};
 
     static DraugrWeaponClass GetWeaponClass(RE::Actor* actor) {
         if (!actor) {
