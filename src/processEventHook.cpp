@@ -58,25 +58,25 @@ namespace draugr {
         return ContainsDraugr(projectName);
     }
 
-    enum class DraugrWeaponClass { kUnknown, kOneHanded, kGreatsword, kTwoHanded };
+    enum class DraugrWeaponClass { kUnknown, kUnarmed, kOneHanded, kGreatsword, kTwoHanded };
 
     //checked from the draugr Race Record. attackstart and attackpowerstartinplace were added to handle SCAR 2.0 attackdata functionality
     static const std::unordered_set<std::string_view> kNormalAttacks{
-        //"attackStart1HMSwipe",
+        "attackStart1HMSwipe",
         "attackStart1HMBackSlash",
         "attackStart1HMX2",
 
         "attackStartGSBackSlash", 
-        //"attackStartGSChop",          
+        "attackStartGSChop",          
         "attackStartGSX2",
 
-        //"attackStart2HMSlash", 
+        "attackStart2HMSlash", 
         "attackStart2HMForwardSwipe", 
         "attackStart2HMBackSwipe",
 
         // Hand to Hand (to be implemented)
-        // "attackStartH2HLeft",
-        // "attackStartH2HRight",
+         "attackStartH2HLeft",
+        "attackStartH2HRight",
 
         "SCAR_DraugrNA", 
         "attackStart",
@@ -85,12 +85,13 @@ namespace draugr {
     static const std::unordered_set<std::string_view> kPowerAttacks{
         "attackStart1HMPowerChop",       
         "attackStart1HMForwardPower", 
-        //"attackStart1HMPowerSlash",
+        "attackStart1HMPowerSlash",
         
-        //"attackStartGSForwardPowerB",
+        "attackStartGSForwardPowerB",
 
         "attackStart2HMForwardPowerChop", 
-        //"attackStart2HMPowerChop",
+        "attackStart2HMPowerChop",
+
         "SCAR_DraugrPA", 
         "attackPowerStartInPlace",
     };
@@ -106,6 +107,8 @@ namespace draugr {
 
     static const AttackTargets k2HW{"attackStart2HMSlash", "attackStart2HMPowerChop"};
 
+    static const AttackTargets k0HM{"attackStartH2HLeft", "attackStartH2HLeft"};
+
     static DraugrWeaponClass GetWeaponClass(RE::Actor* actor) {
         if (!actor) {
             return DraugrWeaponClass::kUnknown;
@@ -115,35 +118,51 @@ namespace draugr {
         auto* equipped = actor->GetEquippedObject(false);
 
         if (!equipped) {
-            return DraugrWeaponClass::kUnknown;
+            //vanilla unarmed draugrs pass through here, probably just assume unarmed in this case.
+            //log::info("[DraugrAttackReroute] NoEquippedObject");
+            //return DraugrWeaponClass::kUnknown;
+            return DraugrWeaponClass::kUnarmed;
         }
 
         auto* weapon = equipped->As<RE::TESObjectWEAP>();
 
         if (!weapon) {
+            //log::info("[DraugrAttackReroute] No Weapon");
             return DraugrWeaponClass::kUnknown;
         }
 
         switch (weapon->GetWeaponType()) {
+            case RE::WEAPON_TYPE::kHandToHandMelee:
+                //log::info("[DraugrAttackReroute] kHandToHandMelee weapontype");
+                return DraugrWeaponClass::kUnarmed;
+
             case RE::WEAPON_TYPE::kOneHandSword:
             case RE::WEAPON_TYPE::kOneHandDagger:
             case RE::WEAPON_TYPE::kOneHandAxe:
             case RE::WEAPON_TYPE::kOneHandMace:
+                //log::info("[DraugrAttackReroute] k1HM weapontype");
                 return DraugrWeaponClass::kOneHanded;
 
             case RE::WEAPON_TYPE::kTwoHandSword:
+                //log::info("[DraugrAttackReroute] k2HM weapontype");
                 return DraugrWeaponClass::kGreatsword;
 
             case RE::WEAPON_TYPE::kTwoHandAxe:
+                //log::info("[DraugrAttackReroute] k2HW weapontype");
                 return DraugrWeaponClass::kTwoHanded;
 
             default:
+                //log::info("[DraugrAttackReroute] kUnknown");
                 return DraugrWeaponClass::kUnknown;
         }
     }
 
     static const RE::BSFixedString* GetReroutedEvent(DraugrWeaponClass a_weaponClass, bool a_powerAttack) {
         switch (a_weaponClass) {
+            case DraugrWeaponClass::kUnarmed:
+                //log::info("[DraugrAttackReroute] no rerouted UnarmedEvent");
+                return a_powerAttack ? &k0HM.power : &k0HM.normal;
+
             case DraugrWeaponClass::kOneHanded:
                 return a_powerAttack ? &k1HM.power : &k1HM.normal;
 
@@ -195,6 +214,7 @@ namespace draugr {
         const auto weaponClass = GetWeaponClass(actor);
 
         if (weaponClass == DraugrWeaponClass::kUnknown) {
+            //log::info("[DraugrAttackReroute] unknown weapon class");
             return _originalNPC(a_this, a_eventName);
         }
 
