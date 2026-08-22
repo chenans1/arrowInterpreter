@@ -40,12 +40,11 @@ namespace arrow {
         rotation.x = actor->GetAimAngle();
         rotation.z = actor->GetAimHeading();
 
-        //log::info(
-        //    "[arrowInterpreter] Launch transform: "
-        //    "origin=({}, {}, {}), pitch={}, yaw={}",
-        //    origin.x, origin.y, origin.z, rotation.x, rotation.z);
+        log::info(
+            "[arrowInterpreter] Launch transform: "
+            "origin=({}, {}, {}), pitch={}, yaw={}",
+            origin.x, origin.y, origin.z, rotation.x, rotation.z);
 
-        RE::ProjectileHandle handle;
         RE::Projectile::LaunchArrow(&handle, actor, ammo, weapon, origin, rotation);
 
         auto projectile = handle.get();
@@ -60,11 +59,72 @@ namespace arrow {
             projectileData.power = 1.0f;
             projectileData.weaponDamage *= damageMult;
         }
-
         log::info(
-            "[arrowInterpreter] After correction: "
-            "power={}, weaponDamage={}",
-            projectileData.power, projectileData.weaponDamage);
+            "[arrowInterpreter] Launch velocities: velocity=({}, {}, {}), linearVelocity=({}, {}, {}),",
+            projectileData.velocity.x, projectileData.velocity.y, projectileData.velocity.z, 
+            projectileData.linearVelocity.x, projectileData.linearVelocity.y, projectileData.linearVelocity.z);
+        //log::info("[arrowInterpreter] After correction: power={}, weaponDamage={}", projectileData.power, projectileData.weaponDamage);
+        return true;
+    }
+
+    static bool releaseArrowOffset(RE::TESAmmo* ammo, RE::TESObjectWEAP* weapon, RE::Actor* actor, float damageMult = 1.0f) {
+        if (!ammo || !weapon || !actor) {
+            log::info("[arrowInterpreter] invalid params for releaseArrow()");
+            return false;
+        }
+
+        auto* currentProcess = actor->GetActorRuntimeData().currentProcess;
+        if (!currentProcess) {
+            log::warn("[arrowInterpreter] Actor {:08X} has no current process", actor->GetFormID());
+            return false;
+        }
+
+        // RE::NiPoint3 origin = fireNode->world.translate;
+        RE::NiPoint3 origin = actor->GetPosition();
+        origin.z += 96.0f;
+        // RE::NiPoint3 origin = weaponNode->world.translate;
+        //gonna offset the Y temporarily for visual clarity purposes
+        origin.y += 96.0f;
+        //origin.x += 96.0f;
+
+        RE::Projectile::ProjectileRot rotation{};
+        rotation.x = actor->GetAimAngle();
+        rotation.z = actor->GetAimHeading();
+
+        rotation.z += 1.0472f; //60 def offset clockwise
+        //log::info(
+        //    "[arrowInterpreter] Launch transform: "
+        //    "origin=({}, {}, {}), pitch={}, yaw={}",
+        //    origin.x, origin.y, origin.z, rotation.x, rotation.z);
+
+        RE::ProjectileHandle handle;
+        RE::Projectile::LaunchData launchData(actor, origin, rotation, ammo, weapon);
+        launchData.autoAim = false;
+        launchData.desiredTarget = nullptr;
+        //launchData.forceConeOfFire = false; //setting false: does nothing from testing
+        RE::Projectile::Launch(&handle, launchData);
+
+        auto projectile = handle.get();
+        if (!projectile) {
+            log::error("[arrowInterpreter] Failed to launch arrow for actor {:08X}", actor->GetFormID());
+            return false;
+        }
+
+        auto& projectileData = projectile->GetProjectileRuntimeData();
+        if (projectileData.power > 0.0f) {
+            projectileData.weaponDamage /= projectileData.power;
+            projectileData.power = 1.0f;
+            projectileData.weaponDamage *= damageMult;
+        }
+
+        //log::info("[arrowInterpreter] Offset Arrow: power={}, weaponDamage={}", 
+        //    projectileData.power,projectileData.weaponDamage);
+
+         log::info("[arrowInterpreter] Offset Arrow Transforms: origin=({}, {}, {}), pitch={}, yaw={}",
+             origin.x, origin.y, origin.z, rotation.x, rotation.z);
+        log::info("[arrowInterpreter] Offset Launch velocities: velocity=({}, {}, {}), linearVelocity=({}, {}, {}),",
+                  projectileData.velocity.x, projectileData.velocity.y, projectileData.velocity.z,
+                  projectileData.linearVelocity.x, projectileData.linearVelocity.y, projectileData.linearVelocity.z);
         return true;
     }
 
@@ -127,6 +187,7 @@ namespace arrow {
         float mult = parse(payload);
         if (releaseArrow(ammo, bow, actor, mult)) {
             actor->UseAmmo(1);
+            releaseArrowOffset(ammo, bow, actor, mult);
         }
 
     }
