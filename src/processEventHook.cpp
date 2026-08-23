@@ -19,6 +19,18 @@ namespace arrow {
         log::info("[processEventHook] ...ProcessEvent hook installed");
     }
 
+    //running this install separated - this way I can probably chain hook TDM and do it right after
+    void ProcessEventHook::InstallProjectileHook() {
+        log::info("[processEventHook] Installing Projectile Hook");
+        auto& trampoline = SKSE::GetTrampoline();
+
+        //hook locations derived from TDM, doing a hook after TDM to avoid dll alphabetical sorting shenanigans
+        REL::Relocation<std::uintptr_t> hook{RELOCATION_ID(43030, 44222)};
+
+        _InitProjectile = trampoline.write_call<5>(hook.address() + REL::Relocate(0x3B8, 0x78A), InitProjectile);
+        log::info("[processEventHook] ...Projectile hook installed");
+    }
+
     static bool releaseArrow(RE::TESAmmo* ammo, RE::TESObjectWEAP* weapon, RE::Actor* actor, float damageMult = 1.0f) {
         if (!ammo || !weapon || !actor) {
             log::info("[arrowInterpreter] invalid params for releaseArrow()");
@@ -93,35 +105,17 @@ namespace arrow {
             return false;
         }
 
-        //// RE::NiPoint3 origin = fireNode->world.translate;
-        //RE::NiPoint3 origin = actor->GetPosition();
-        //origin.z += 96.0f;
-        //// RE::NiPoint3 origin = weaponNode->world.translate;
-        ////gonna offset the Y temporarily for visual clarity purposes
-        //origin.y += 96.0f;
-        ////origin.x += 96.0f;
-
-        //RE::Projectile::ProjectileRot rotation{};
-        //rotation.x = actor->GetAimAngle();
-        //rotation.z = actor->GetAimHeading();
-
-        //rotation.z += 1.0472f; //60 def offset clockwise
         const auto& biped = actor->GetBiped2();
         RE::NiAVObject* weapon3D = nullptr;
 
-        // fetch the bow location, not sure if this is a good idea depends on whether the anim features draw pull or
-        // not? IDK.
-
         for (std::size_t i = 0; i < RE::BIPED_OBJECTS::kTotal; ++i) {
             auto& object = biped->objects[i];
-
             if (object.item == weapon && object.partClone) {
                 weapon3D = object.partClone.get();
-                // log::info("[arrowInterpreter] Weapon biped slot {}: partClone={}, name={}", i,
-                // static_cast<void*>(weapon3D), weapon3D->name.c_str());
                 break;
             }
         }
+
         RE::NiPoint3 origin;
         RE::Projectile::ProjectileRot rotation{};
 
@@ -136,8 +130,8 @@ namespace arrow {
             rotation.z = actor->GetAimHeading();
             log::warn("[arrowInterpreter] No weapon/fire node; using actor fallback");
         }
-        rotation.z += 1.0472f;
-        origin.y += 96.0f;
+        //rotation.z += 1.5708f;
+        //origin.y += 96.0f;
         RE::ProjectileHandle handle;
         RE::Projectile::LaunchData launchData(actor, origin, rotation, ammo, weapon);
         launchData.autoAim = false;
@@ -148,14 +142,6 @@ namespace arrow {
             log::error("[arrowInterpreter] Failed to launch arrow for actor {:08X}", actor->GetFormID());
             return false;
         }
-        //from noahboddie: quarternion rotation multiplication
-        auto point = projectile->GetAngle();
-        Quaternion current = Quaternion::CreateFromYawPitchRoll(Vector3{point.x, point.y, point.z});
-        log::info("Before SetAngle: ({}, {}, {})", point.x, point.y, point.z);
-        Quaternion offset = Quaternion::CreateFromYawPitchRoll(Vector3{0.0f, 0.0f, 1.0472f});
-        Quaternion combined = offset * current;
-        Vector3 result = combined.ToEuler();
-        projectile->SetAngle(RE::NiPoint3{result.x, result.y, result.z});
         auto& projectileData = projectile->GetProjectileRuntimeData();
         if (projectileData.power > 0.0f) {
             projectileData.weaponDamage /= projectileData.power;
@@ -163,27 +149,8 @@ namespace arrow {
             projectileData.weaponDamage *= damageMult;
         }
 
-        log::info("After SetAngle: ({}, {}, {})", result.x, result.y, result.z);
-        //projectile->SetAngle(RE::NiPoint3{result.x, result.y, result.z});
-
-        //log::info("After SetAngle: ({}, {}, {})", result.x, result.y, result.z);
-        
-        //auto point = projectile->GetAngle();
-
-        //log::info("Before SetAngle: ({}, {}, {})", point.x, point.y, point.z);
-
-        //point.z += RE::deg_to_rad(60.0f);
-
-        //projectile->SetAngle(point);
-
-        //log::info("After SetAngle: ({}, {}, {})", point.x, point.y, point.z);
-
-        //log::info("[arrowInterpreter] Offset Arrow Transforms: origin=({}, {}, {}), pitch={}, yaw={}",
-        //     origin.x, origin.y, origin.z, rotation.x, rotation.z);
-        //log::info("[arrowInterpreter] Offset Launch velocities: velocity=({}, {}, {}), linearVelocity=({}, {}, {}),",
-        //          projectileData.velocity.x, projectileData.velocity.y, projectileData.velocity.z,
-        //          projectileData.linearVelocity.x, projectileData.linearVelocity.y, projectileData.linearVelocity.z);
-
+        //add the arrow to the pendingArrows map so that in getlinearvelocity we update the value
+        ProcessEventHook::AddPendingArrow(projectile.get(), 1.5708f);
         return true;
     }
 
@@ -267,6 +234,39 @@ namespace arrow {
     {
         HandleEvent(a_event);
         return _originalPC(a_sink, a_event, a_eventSource);
+    }
+
+    void ProcessEventHook::AddPendingArrow(const RE::Projectile* a_projectile, float a_offset) {
+        //std::scoped_lock lock(pendingArrowsMutex);
+        pendingArrows.emplace(a_projectile, a_offset);
+        log::info("[arrowInterpreter] Stored Arrow");
+    }
+
+    void ProcessEventHook::InitProjectile(RE::Projectile* a_this) { 
+        _InitProjectile(a_this);
+        //log::info("[arrowInterpreter] Init Hook ran");
+        auto it = pendingArrows.find(a_this);
+
+        //log::info("[arrowInterpreter] Init ptr={}, pending={}", static_cast<void*>(a_this), it != pendingArrows.end());
+        float offset = 0.0f;
+        if (it == pendingArrows.end()) {
+            return;
+        }
+        offset = it->second;
+        pendingArrows.erase(it);
+        auto& velocity = a_this->GetProjectileRuntimeData().linearVelocity;
+
+        const float c = std::cos(offset);
+        const float s = std::sin(offset);
+
+        const float x = velocity.x;
+        const float y = velocity.y;
+        log::info("[arrowInterpreter] Before velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
+
+        velocity.x = x * c - y * s;
+        velocity.y = x * s + y * c;
+        log::info("[arrowInterpreter] Modified velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
+
     }
 
 }

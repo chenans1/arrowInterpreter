@@ -45,6 +45,12 @@ SKSEPluginLoad(const SKSE::LoadInterface* skse) {
     log::info("{} {} is loading...", plugin->GetName(), version);
     SKSE::Init(skse);
     arrow::ProcessEventHook::Install();
+    SKSE::AllocTrampoline(14);
+    SKSE::GetMessagingInterface()->RegisterListener([](SKSE::MessagingInterface::Message* msg) {
+        if (msg->type == SKSE::MessagingInterface::kPostLoad) {
+            arrow::ProcessEventHook::InstallProjectileHook();
+        }
+    });
     log::info("{} has finished loading.", plugin->GetName());
     return true;
 }

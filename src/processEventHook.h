@@ -4,7 +4,8 @@ namespace arrow {
     class ProcessEventHook {
     public:
         static void Install();
-
+        static void InstallProjectileHook();
+        static void AddPendingArrow(const RE::Projectile* a_projectile, float a_offset);
     private:
         static RE::BSEventNotifyControl ProcessEvent_NPC(
             RE::BSTEventSink<RE::BSAnimationGraphEvent>* a_sink,
@@ -18,5 +19,15 @@ namespace arrow {
 
         static inline REL::Relocation<decltype(ProcessEvent_NPC)> _originalNPC;
         static inline REL::Relocation<decltype(ProcessEvent_PC)> _originalPC;
+
+        //used to detect the arrows that are fired. 
+        static inline std::unordered_map<const RE::Projectile*, float> pendingArrows;
+
+        //static void GetLinearVelocity(const RE::Projectile* a_projectile, RE::NiPoint3& a_velocity);
+        //static inline REL::Relocation<decltype(GetLinearVelocity)> _originalGetLinearVelocity;
+
+        static void InitProjectile(RE::Projectile* a_this);
+        static inline REL::Relocation<decltype(InitProjectile)> _InitProjectile;
+
     };
 }
