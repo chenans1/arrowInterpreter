@@ -31,20 +31,35 @@ namespace arrow {
             return false;
         }
 
-        //RE::NiPoint3 origin = fireNode->world.translate;
-        RE::NiPoint3 origin = actor->GetPosition();
-        origin.z += 96.0f;
-        //RE::NiPoint3 origin = weaponNode->world.translate;
+        const auto& biped = actor->GetBiped2();
+        RE::NiAVObject* weapon3D = nullptr;
+
+        //fetch the bow location, not sure if this is a good idea depends on whether the anim features draw pull or not? IDK.
+        for (std::size_t i = 0; i < RE::BIPED_OBJECTS::kTotal; ++i) {
+            auto& object = biped->objects[i];
+
+            if (object.item == weapon && object.partClone) {
+                weapon3D = object.partClone.get();
+                //log::info("[arrowInterpreter] Weapon biped slot {}: partClone={}, name={}", i, static_cast<void*>(weapon3D), weapon3D->name.c_str());
+                break;
+            }
+        }
+        RE::NiPoint3 origin;
         RE::Projectile::ProjectileRot rotation{};
 
-        rotation.x = actor->GetAimAngle();
-        rotation.z = actor->GetAimHeading();
-        log::info(
-            "[arrowInterpreter] Launch transform: origin=({}, {}, {}), pitch={}, yaw={}",
-            origin.x, origin.y, origin.z, rotation.x, rotation.z);
+        if (weapon3D) {
+            origin = weapon3D->world.translate;
+            rotation.x = actor->GetAimAngle();
+            rotation.z = actor->GetAimHeading();
+        } else {
+            origin = actor->GetPosition();
+            origin.z += 96.0f;
+            rotation.x = actor->GetAimAngle();
+            rotation.z = actor->GetAimHeading();
+            log::warn("[arrowInterpreter] No weapon/fire node; using actor fallback");
+        }
 
         RE::ProjectileHandle handle;
-        //RE::Projectile::LaunchArrow(&handle, actor, ammo, weapon, origin, rotation);
         RE::Projectile::LaunchData launchData(actor, origin, rotation, ammo, weapon);
 
         launchData.autoAim = false;
@@ -52,8 +67,6 @@ namespace arrow {
         RE::Projectile::Launch(&handle, launchData);
 
         auto projectile = handle.get();
-        //RE::NiPoint3 point = projectile->GetAngle();
-        //Quaternion main = Quaternion::CreateFromYawPitchRoll();
         if (!projectile) {
             log::error("[arrowInterpreter] Failed to launch arrow for actor {:08X}", actor->GetFormID());
             return false;
@@ -80,22 +93,51 @@ namespace arrow {
             return false;
         }
 
-        // RE::NiPoint3 origin = fireNode->world.translate;
-        RE::NiPoint3 origin = actor->GetPosition();
+        //// RE::NiPoint3 origin = fireNode->world.translate;
+        //RE::NiPoint3 origin = actor->GetPosition();
+        //origin.z += 96.0f;
+        //// RE::NiPoint3 origin = weaponNode->world.translate;
+        ////gonna offset the Y temporarily for visual clarity purposes
+        //origin.y += 96.0f;
+        ////origin.x += 96.0f;
 
-        RE::NiPoint3 origin = 
-        origin.z += 96.0f;
-        // RE::NiPoint3 origin = weaponNode->world.translate;
-        //gonna offset the Y temporarily for visual clarity purposes
-        origin.y += 96.0f;
-        //origin.x += 96.0f;
-
-        RE::Projectile::ProjectileRot rotation{};
-        rotation.x = actor->GetAimAngle();
-        rotation.z = actor->GetAimHeading();
+        //RE::Projectile::ProjectileRot rotation{};
+        //rotation.x = actor->GetAimAngle();
+        //rotation.z = actor->GetAimHeading();
 
         //rotation.z += 1.0472f; //60 def offset clockwise
+        const auto& biped = actor->GetBiped2();
+        RE::NiAVObject* weapon3D = nullptr;
 
+        // fetch the bow location, not sure if this is a good idea depends on whether the anim features draw pull or
+        // not? IDK.
+
+        for (std::size_t i = 0; i < RE::BIPED_OBJECTS::kTotal; ++i) {
+            auto& object = biped->objects[i];
+
+            if (object.item == weapon && object.partClone) {
+                weapon3D = object.partClone.get();
+                // log::info("[arrowInterpreter] Weapon biped slot {}: partClone={}, name={}", i,
+                // static_cast<void*>(weapon3D), weapon3D->name.c_str());
+                break;
+            }
+        }
+        RE::NiPoint3 origin;
+        RE::Projectile::ProjectileRot rotation{};
+
+        if (weapon3D) {
+            origin = weapon3D->world.translate;
+            rotation.x = actor->GetAimAngle();
+            rotation.z = actor->GetAimHeading();
+        } else {
+            origin = actor->GetPosition();
+            origin.z += 96.0f;
+            rotation.x = actor->GetAimAngle();
+            rotation.z = actor->GetAimHeading();
+            log::warn("[arrowInterpreter] No weapon/fire node; using actor fallback");
+        }
+        rotation.z += 1.0472f;
+        origin.y += 96.0f;
         RE::ProjectileHandle handle;
         RE::Projectile::LaunchData launchData(actor, origin, rotation, ammo, weapon);
         launchData.autoAim = false;
@@ -122,15 +164,6 @@ namespace arrow {
         }
 
         log::info("After SetAngle: ({}, {}, {})", result.x, result.y, result.z);
-
-        //from noahboddie: quarternion rotation multiplication
-        //auto point = projectile->GetAngle();
-        //Quaternion current = Quaternion::CreateFromYawPitchRoll(Vector3{point.x, point.y, point.z});
-        //log::info("Before SetAngle: ({}, {}, {})", point.x, point.y, point.z);
-        //Quaternion offset = Quaternion::CreateFromYawPitchRoll(Vector3{0.0f, 0.0f, 1.0472f});
-        //Quaternion combined = offset * current;
-        //Vector3 result = combined.ToEuler();
-
         //projectile->SetAngle(RE::NiPoint3{result.x, result.y, result.z});
 
         //log::info("After SetAngle: ({}, {}, {})", result.x, result.y, result.z);
