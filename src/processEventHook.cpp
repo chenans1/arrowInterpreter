@@ -39,15 +39,21 @@ namespace arrow {
 
         rotation.x = actor->GetAimAngle();
         rotation.z = actor->GetAimHeading();
-
         log::info(
-            "[arrowInterpreter] Launch transform: "
-            "origin=({}, {}, {}), pitch={}, yaw={}",
+            "[arrowInterpreter] Launch transform: origin=({}, {}, {}), pitch={}, yaw={}",
             origin.x, origin.y, origin.z, rotation.x, rotation.z);
 
-        RE::Projectile::LaunchArrow(&handle, actor, ammo, weapon, origin, rotation);
+        RE::ProjectileHandle handle;
+        //RE::Projectile::LaunchArrow(&handle, actor, ammo, weapon, origin, rotation);
+        RE::Projectile::LaunchData launchData(actor, origin, rotation, ammo, weapon);
+
+        launchData.autoAim = false;
+        launchData.desiredTarget = nullptr;
+        RE::Projectile::Launch(&handle, launchData);
 
         auto projectile = handle.get();
+        //RE::NiPoint3 point = projectile->GetAngle();
+        //Quaternion main = Quaternion::CreateFromYawPitchRoll();
         if (!projectile) {
             log::error("[arrowInterpreter] Failed to launch arrow for actor {:08X}", actor->GetFormID());
             return false;
@@ -59,11 +65,6 @@ namespace arrow {
             projectileData.power = 1.0f;
             projectileData.weaponDamage *= damageMult;
         }
-        log::info(
-            "[arrowInterpreter] Launch velocities: velocity=({}, {}, {}), linearVelocity=({}, {}, {}),",
-            projectileData.velocity.x, projectileData.velocity.y, projectileData.velocity.z, 
-            projectileData.linearVelocity.x, projectileData.linearVelocity.y, projectileData.linearVelocity.z);
-        //log::info("[arrowInterpreter] After correction: power={}, weaponDamage={}", projectileData.power, projectileData.weaponDamage);
         return true;
     }
 
@@ -81,6 +82,8 @@ namespace arrow {
 
         // RE::NiPoint3 origin = fireNode->world.translate;
         RE::NiPoint3 origin = actor->GetPosition();
+
+        RE::NiPoint3 origin = 
         origin.z += 96.0f;
         // RE::NiPoint3 origin = weaponNode->world.translate;
         //gonna offset the Y temporarily for visual clarity purposes
@@ -91,25 +94,26 @@ namespace arrow {
         rotation.x = actor->GetAimAngle();
         rotation.z = actor->GetAimHeading();
 
-        rotation.z += 1.0472f; //60 def offset clockwise
-        //log::info(
-        //    "[arrowInterpreter] Launch transform: "
-        //    "origin=({}, {}, {}), pitch={}, yaw={}",
-        //    origin.x, origin.y, origin.z, rotation.x, rotation.z);
+        //rotation.z += 1.0472f; //60 def offset clockwise
 
         RE::ProjectileHandle handle;
         RE::Projectile::LaunchData launchData(actor, origin, rotation, ammo, weapon);
         launchData.autoAim = false;
         launchData.desiredTarget = nullptr;
-        //launchData.forceConeOfFire = false; //setting false: does nothing from testing
         RE::Projectile::Launch(&handle, launchData);
-
         auto projectile = handle.get();
         if (!projectile) {
             log::error("[arrowInterpreter] Failed to launch arrow for actor {:08X}", actor->GetFormID());
             return false;
         }
-
+        //from noahboddie: quarternion rotation multiplication
+        auto point = projectile->GetAngle();
+        Quaternion current = Quaternion::CreateFromYawPitchRoll(Vector3{point.x, point.y, point.z});
+        log::info("Before SetAngle: ({}, {}, {})", point.x, point.y, point.z);
+        Quaternion offset = Quaternion::CreateFromYawPitchRoll(Vector3{0.0f, 0.0f, 1.0472f});
+        Quaternion combined = offset * current;
+        Vector3 result = combined.ToEuler();
+        projectile->SetAngle(RE::NiPoint3{result.x, result.y, result.z});
         auto& projectileData = projectile->GetProjectileRuntimeData();
         if (projectileData.power > 0.0f) {
             projectileData.weaponDamage /= projectileData.power;
@@ -117,14 +121,36 @@ namespace arrow {
             projectileData.weaponDamage *= damageMult;
         }
 
-        //log::info("[arrowInterpreter] Offset Arrow: power={}, weaponDamage={}", 
-        //    projectileData.power,projectileData.weaponDamage);
+        log::info("After SetAngle: ({}, {}, {})", result.x, result.y, result.z);
 
-         log::info("[arrowInterpreter] Offset Arrow Transforms: origin=({}, {}, {}), pitch={}, yaw={}",
-             origin.x, origin.y, origin.z, rotation.x, rotation.z);
-        log::info("[arrowInterpreter] Offset Launch velocities: velocity=({}, {}, {}), linearVelocity=({}, {}, {}),",
-                  projectileData.velocity.x, projectileData.velocity.y, projectileData.velocity.z,
-                  projectileData.linearVelocity.x, projectileData.linearVelocity.y, projectileData.linearVelocity.z);
+        //from noahboddie: quarternion rotation multiplication
+        //auto point = projectile->GetAngle();
+        //Quaternion current = Quaternion::CreateFromYawPitchRoll(Vector3{point.x, point.y, point.z});
+        //log::info("Before SetAngle: ({}, {}, {})", point.x, point.y, point.z);
+        //Quaternion offset = Quaternion::CreateFromYawPitchRoll(Vector3{0.0f, 0.0f, 1.0472f});
+        //Quaternion combined = offset * current;
+        //Vector3 result = combined.ToEuler();
+
+        //projectile->SetAngle(RE::NiPoint3{result.x, result.y, result.z});
+
+        //log::info("After SetAngle: ({}, {}, {})", result.x, result.y, result.z);
+        
+        //auto point = projectile->GetAngle();
+
+        //log::info("Before SetAngle: ({}, {}, {})", point.x, point.y, point.z);
+
+        //point.z += RE::deg_to_rad(60.0f);
+
+        //projectile->SetAngle(point);
+
+        //log::info("After SetAngle: ({}, {}, {})", point.x, point.y, point.z);
+
+        //log::info("[arrowInterpreter] Offset Arrow Transforms: origin=({}, {}, {}), pitch={}, yaw={}",
+        //     origin.x, origin.y, origin.z, rotation.x, rotation.z);
+        //log::info("[arrowInterpreter] Offset Launch velocities: velocity=({}, {}, {}), linearVelocity=({}, {}, {}),",
+        //          projectileData.velocity.x, projectileData.velocity.y, projectileData.velocity.z,
+        //          projectileData.linearVelocity.x, projectileData.linearVelocity.y, projectileData.linearVelocity.z);
+
         return true;
     }
 
