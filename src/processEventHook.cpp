@@ -93,7 +93,7 @@ namespace arrow {
         return true;
     }
 
-    static bool releaseArrowOffset(RE::TESAmmo* ammo, RE::TESObjectWEAP* weapon, RE::Actor* actor, float damageMult = 1.0f) {
+    static bool releaseArrowOffset(RE::TESAmmo* ammo, RE::TESObjectWEAP* weapon, RE::Actor* actor, float damageMult = 1.0f, float offset = 0.0f) {
         if (!ammo || !weapon || !actor) {
             log::info("[arrowInterpreter] invalid params for releaseArrow()");
             return false;
@@ -130,7 +130,7 @@ namespace arrow {
             rotation.z = actor->GetAimHeading();
             log::warn("[arrowInterpreter] No weapon/fire node; using actor fallback");
         }
-        //rotation.z += 1.5708f;
+        //rotation.z += 0.523599f;
         //origin.y += 96.0f;
         RE::ProjectileHandle handle;
         RE::Projectile::LaunchData launchData(actor, origin, rotation, ammo, weapon);
@@ -148,9 +148,13 @@ namespace arrow {
             projectileData.power = 1.0f;
             projectileData.weaponDamage *= damageMult;
         }
-
-        //add the arrow to the pendingArrows map so that in getlinearvelocity we update the value
-        ProcessEventHook::AddPendingArrow(projectile.get(), 1.5708f);
+        log::info("offset deg={}, offset rad={}",offset, RE::deg_to_rad(offset));
+        ProcessEventHook::AddPendingArrow(projectile.get(), RE::deg_to_rad(offset));
+        //auto point = projectile->GetAngle();
+        //log::info("[arrowInterpreter] Original Angle=({}, {}, {})", point.x, point.y, point.z);
+        //point.z -= offset;
+        //projectile->SetAngle(point);
+        //log::info("[arrowInterpreter] Original Angle=({}, {}, {})", projectile->GetAngle().x, projectile->GetAngle().y, projectile->GetAngle().z);
         return true;
     }
 
@@ -213,7 +217,8 @@ namespace arrow {
         float mult = parse(payload);
         if (releaseArrow(ammo, bow, actor, mult)) {
             actor->UseAmmo(1);
-            releaseArrowOffset(ammo, bow, actor, mult);
+            releaseArrowOffset(ammo, bow, actor, mult, 12.0f);
+            releaseArrowOffset(ammo, bow, actor, mult, -12.0f);
         }
 
     }
@@ -253,6 +258,7 @@ namespace arrow {
             return;
         }
         offset = it->second;
+        log::info("[initHook] offset={}", offset);
         pendingArrows.erase(it);
         auto& velocity = a_this->GetProjectileRuntimeData().linearVelocity;
 
@@ -261,12 +267,18 @@ namespace arrow {
 
         const float x = velocity.x;
         const float y = velocity.y;
-        log::info("[arrowInterpreter] Before velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
+        //log::info("[arrowInterpreter] Before velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
 
         velocity.x = x * c - y * s;
         velocity.y = x * s + y * c;
-        log::info("[arrowInterpreter] Modified velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
-
+        //log::info("[arrowInterpreter] Modified velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
+        
+        // modify proj rotation visually
+        auto point = a_this->GetAngle();
+        log::info("[arrowInterpreter] Original Angle=({}, {}, {})", point.x, point.y, point.z);
+        point.z -= offset;
+        a_this->SetAngle(point);
+        log::info("[arrowInterpreter] Original Angle=({}, {}, {})", 
+            a_this->GetAngle().x, a_this->GetAngle().y,a_this->GetAngle().z);
     }
-
 }
