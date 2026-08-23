@@ -105,6 +105,7 @@ namespace arrow {
             return false;
         }
 
+        //fetches the weapon node, not sure if this is a good idea.
         const auto& biped = actor->GetBiped2();
         RE::NiAVObject* weapon3D = nullptr;
 
@@ -130,8 +131,6 @@ namespace arrow {
             rotation.z = actor->GetAimHeading();
             log::warn("[arrowInterpreter] No weapon/fire node; using actor fallback");
         }
-        //rotation.z += 0.523599f;
-        //origin.y += 96.0f;
         RE::ProjectileHandle handle;
         RE::Projectile::LaunchData launchData(actor, origin, rotation, ammo, weapon);
         launchData.autoAim = false;
@@ -148,8 +147,10 @@ namespace arrow {
             projectileData.power = 1.0f;
             projectileData.weaponDamage *= damageMult;
         }
-        log::info("offset deg={}, offset rad={}",offset, RE::deg_to_rad(offset));
-        ProcessEventHook::AddPendingArrow(projectile.get(), RE::deg_to_rad(offset));
+        //log::info("offset deg={}, offset rad={}",offset, RE::deg_to_rad(offset));
+        if (offset != 0.0f) {
+            ProcessEventHook::AddPendingArrow(projectile.get(), RE::deg_to_rad(offset));
+        }
         //auto point = projectile->GetAngle();
         //log::info("[arrowInterpreter] Original Angle=({}, {}, {})", point.x, point.y, point.z);
         //point.z -= offset;
@@ -242,24 +243,27 @@ namespace arrow {
     }
 
     void ProcessEventHook::AddPendingArrow(const RE::Projectile* a_projectile, float a_offset) {
-        //std::scoped_lock lock(pendingArrowsMutex);
+        std::scoped_lock lock(pendingArrowsMutex);
         pendingArrows.emplace(a_projectile, a_offset);
-        log::info("[arrowInterpreter] Stored Arrow");
+        //log::info("[arrowInterpreter] Stored Arrow");
     }
 
     void ProcessEventHook::InitProjectile(RE::Projectile* a_this) { 
         _InitProjectile(a_this);
         //log::info("[arrowInterpreter] Init Hook ran");
-        auto it = pendingArrows.find(a_this);
-
         //log::info("[arrowInterpreter] Init ptr={}, pending={}", static_cast<void*>(a_this), it != pendingArrows.end());
         float offset = 0.0f;
-        if (it == pendingArrows.end()) {
-            return;
+        {
+            std::scoped_lock lock(pendingArrowsMutex);
+
+            auto it = pendingArrows.find(a_this);
+            if (it == pendingArrows.end()) {
+                return;
+            }
+
+            offset = it->second;
+            pendingArrows.erase(it);
         }
-        offset = it->second;
-        log::info("[initHook] offset={}", offset);
-        pendingArrows.erase(it);
         auto& velocity = a_this->GetProjectileRuntimeData().linearVelocity;
 
         const float c = std::cos(offset);
@@ -275,10 +279,10 @@ namespace arrow {
         
         // modify proj rotation visually
         auto point = a_this->GetAngle();
-        log::info("[arrowInterpreter] Original Angle=({}, {}, {})", point.x, point.y, point.z);
+        //log::info("[arrowInterpreter] Original Angle=({}, {}, {})", point.x, point.y, point.z);
         point.z -= offset;
         a_this->SetAngle(point);
-        log::info("[arrowInterpreter] Original Angle=({}, {}, {})", 
-            a_this->GetAngle().x, a_this->GetAngle().y,a_this->GetAngle().z);
+        //log::info("[arrowInterpreter] Original Angle=({}, {}, {})", 
+        //    a_this->GetAngle().x, a_this->GetAngle().y,a_this->GetAngle().z);
     }
 }

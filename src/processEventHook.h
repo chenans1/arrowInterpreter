@@ -22,9 +22,7 @@ namespace arrow {
 
         //used to detect the arrows that are fired. 
         static inline std::unordered_map<const RE::Projectile*, float> pendingArrows;
-
-        //static void GetLinearVelocity(const RE::Projectile* a_projectile, RE::NiPoint3& a_velocity);
-        //static inline REL::Relocation<decltype(GetLinearVelocity)> _originalGetLinearVelocity;
+        static inline std::mutex pendingArrowsMutex;
 
         static void InitProjectile(RE::Projectile* a_this);
         static inline REL::Relocation<decltype(InitProjectile)> _InitProjectile;
