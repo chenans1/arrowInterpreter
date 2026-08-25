@@ -2,9 +2,10 @@
 
 namespace arrow {
     struct arrowPayload {
-        int arrowCount;
-        std::optional<float> spreadAngle;
-        std::optional<float> damageMult;
+        float damageMult{1.0f};
+        std::uint32_t count{1};
+        float spread{0.0f};
+        std::uint32_t consume{1};
     };
 
     arrowPayload process(std::string_view payload);

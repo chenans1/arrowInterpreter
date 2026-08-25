@@ -1,5 +1,6 @@
 #include "PCH.h"
 #include "processEventHook.h"
+#include "payload.h"
 
 using namespace SKSE;
 using namespace SKSE::log;
@@ -31,67 +32,67 @@ namespace arrow {
         log::info("[processEventHook] ...Projectile hook installed");
     }
 
-    static bool releaseArrow(RE::TESAmmo* ammo, RE::TESObjectWEAP* weapon, RE::Actor* actor, float damageMult = 1.0f) {
-        if (!ammo || !weapon || !actor) {
-            log::info("[arrowInterpreter] invalid params for releaseArrow()");
-            return false;
-        }
+    //static bool releaseArrow(RE::TESAmmo* ammo, RE::TESObjectWEAP* weapon, RE::Actor* actor, float damageMult = 1.0f) {
+    //    if (!ammo || !weapon || !actor) {
+    //        log::info("[arrowInterpreter] invalid params for releaseArrow()");
+    //        return false;
+    //    }
 
-        auto* currentProcess = actor->GetActorRuntimeData().currentProcess;
-        if (!currentProcess) {
-            log::warn("[arrowInterpreter] Actor {:08X} has no current process", actor->GetFormID());
-            return false;
-        }
+    //    auto* currentProcess = actor->GetActorRuntimeData().currentProcess;
+    //    if (!currentProcess) {
+    //        log::warn("[arrowInterpreter] Actor {:08X} has no current process", actor->GetFormID());
+    //        return false;
+    //    }
 
-        const auto& biped = actor->GetBiped2();
-        RE::NiAVObject* weapon3D = nullptr;
+    //    const auto& biped = actor->GetBiped2();
+    //    RE::NiAVObject* weapon3D = nullptr;
 
-        //fetch the bow location, not sure if this is a good idea depends on whether the anim features draw pull or not? IDK.
-        for (std::size_t i = 0; i < RE::BIPED_OBJECTS::kTotal; ++i) {
-            auto& object = biped->objects[i];
+    //    //fetch the bow location, not sure if this is a good idea depends on whether the anim features draw pull or not? IDK.
+    //    for (std::size_t i = 0; i < RE::BIPED_OBJECTS::kTotal; ++i) {
+    //        auto& object = biped->objects[i];
 
-            if (object.item == weapon && object.partClone) {
-                weapon3D = object.partClone.get();
-                //log::info("[arrowInterpreter] Weapon biped slot {}: partClone={}, name={}", i, static_cast<void*>(weapon3D), weapon3D->name.c_str());
-                break;
-            }
-        }
-        RE::NiPoint3 origin;
-        RE::Projectile::ProjectileRot rotation{};
+    //        if (object.item == weapon && object.partClone) {
+    //            weapon3D = object.partClone.get();
+    //            //log::info("[arrowInterpreter] Weapon biped slot {}: partClone={}, name={}", i, static_cast<void*>(weapon3D), weapon3D->name.c_str());
+    //            break;
+    //        }
+    //    }
+    //    RE::NiPoint3 origin;
+    //    RE::Projectile::ProjectileRot rotation{};
 
-        if (weapon3D) {
-            origin = weapon3D->world.translate;
-            rotation.x = actor->GetAimAngle();
-            rotation.z = actor->GetAimHeading();
-        } else {
-            origin = actor->GetPosition();
-            origin.z += 96.0f;
-            rotation.x = actor->GetAimAngle();
-            rotation.z = actor->GetAimHeading();
-            log::warn("[arrowInterpreter] No weapon/fire node; using actor fallback");
-        }
+    //    if (weapon3D) {
+    //        origin = weapon3D->world.translate;
+    //        rotation.x = actor->GetAimAngle();
+    //        rotation.z = actor->GetAimHeading();
+    //    } else {
+    //        origin = actor->GetPosition();
+    //        origin.z += 96.0f;
+    //        rotation.x = actor->GetAimAngle();
+    //        rotation.z = actor->GetAimHeading();
+    //        log::warn("[arrowInterpreter] No weapon/fire node; using actor fallback");
+    //    }
 
-        RE::ProjectileHandle handle;
-        RE::Projectile::LaunchData launchData(actor, origin, rotation, ammo, weapon);
+    //    RE::ProjectileHandle handle;
+    //    RE::Projectile::LaunchData launchData(actor, origin, rotation, ammo, weapon);
 
-        launchData.autoAim = false;
-        launchData.desiredTarget = nullptr;
-        RE::Projectile::Launch(&handle, launchData);
+    //    launchData.autoAim = false;
+    //    launchData.desiredTarget = nullptr;
+    //    RE::Projectile::Launch(&handle, launchData);
 
-        auto projectile = handle.get();
-        if (!projectile) {
-            log::error("[arrowInterpreter] Failed to launch arrow for actor {:08X}", actor->GetFormID());
-            return false;
-        }
+    //    auto projectile = handle.get();
+    //    if (!projectile) {
+    //        log::error("[arrowInterpreter] Failed to launch arrow for actor {:08X}", actor->GetFormID());
+    //        return false;
+    //    }
 
-        auto& projectileData = projectile->GetProjectileRuntimeData();
-        if (projectileData.power > 0.0f) {
-            projectileData.weaponDamage /= projectileData.power;
-            projectileData.power = 1.0f;
-            projectileData.weaponDamage *= damageMult;
-        }
-        return true;
-    }
+    //    auto& projectileData = projectile->GetProjectileRuntimeData();  
+    //    if (projectileData.power > 0.0f) {
+    //        projectileData.weaponDamage /= projectileData.power;
+    //        projectileData.power = 1.0f;
+    //        projectileData.weaponDamage *= damageMult;
+    //    }
+    //    return true;
+    //}
 
     static bool releaseArrowOffset(RE::TESAmmo* ammo, RE::TESObjectWEAP* weapon, RE::Actor* actor, float damageMult = 1.0f, float offset = 0.0f) {
         if (!ammo || !weapon || !actor) {
@@ -160,29 +161,29 @@ namespace arrow {
     }
 
     //process stringview into float basic implementation for testing
-    static float parse(std::string_view payload, float defaultValue = 1.0f) {
-        constexpr std::string_view prefix = "dmg=";
-        if (!payload.starts_with(prefix)) {
-            return defaultValue;
-        }
-        payload.remove_prefix(prefix.size());
+    //static float parse(std::string_view payload, float defaultValue = 1.0f) {
+    //    constexpr std::string_view prefix = "dmg=";
+    //    if (!payload.starts_with(prefix)) {
+    //        return defaultValue;
+    //    }
+    //    payload.remove_prefix(prefix.size());
 
-        if (payload.empty()) {
-            return defaultValue;
-        }
+    //    if (payload.empty()) {
+    //        return defaultValue;
+    //    }
 
-        float value = defaultValue;
+    //    float value = defaultValue;
 
-        const char* begin = payload.data();
-        const char* end = begin + payload.size();
+    //    const char* begin = payload.data();
+    //    const char* end = begin + payload.size();
 
-        const auto [ptr, error] = std::from_chars(begin, end, value);
-        if (error != std::errc{} || ptr != end) {
-            return defaultValue;
-        }
+    //    const auto [ptr, error] = std::from_chars(begin, end, value);
+    //    if (error != std::errc{} || ptr != end) {
+    //        return defaultValue;
+    //    }
 
-        return value;
-    }
+    //    return value;
+    //}
 
     //checks if it's out tag
     static void HandleEvent(RE::BSAnimationGraphEvent* a_event) {
@@ -215,13 +216,43 @@ namespace arrow {
         //going with format is like dmg=float|count=int{1, 15}|spread=float{0, 360}
         //eg: arrowinterpreter.dmg=0.5|count=3|spread=45.0
         //launch an arrow
-        float mult = parse(payload);
-        if (releaseArrow(ammo, bow, actor, mult)) {
-            actor->UseAmmo(1);
-            releaseArrowOffset(ammo, bow, actor, mult, 12.0f);
-            releaseArrowOffset(ammo, bow, actor, mult, -12.0f);
+        //float mult = parse(payload);
+        //if (releaseArrow(ammo, bow, actor, mult)) {
+        //    actor->UseAmmo(1);
+        //    releaseArrowOffset(ammo, bow, actor, mult, 12.0f);
+        //    releaseArrowOffset(ammo, bow, actor, mult, -12.0f);
+        //}
+
+        const auto params = process(payload);
+        log::info("[releaseArrow] dmg={} count={} spread={} consume={}", params.damageMult, params.count, params.spread,
+                  params.consume);
+        if (params.consume > 0) {
+            const std::int32_t ammoCount = actor->GetInventoryItemCount(ammo);
+
+            if (ammoCount < static_cast<std::int32_t>(params.consume)) {
+                log::info("[releaseArrow] Actor {:08X}: insufficient ammo ({}/{})", actor->GetFormID(), ammoCount, params.consume);
+                return;
+            }
         }
 
+        if (params.count == 1) {
+            if (!releaseArrowOffset(ammo, bow, actor, params.damageMult, 0.0f)) {
+                return;
+            }
+        } else {
+            //just doing even distribution along the spread angle
+            //eg. 30 deg, 3 arrows => (-15, 0, 15)
+            const float step = params.spread / static_cast<float>(params.count - 1);
+            const float start = -(params.spread * 0.5f);
+            for (std::uint32_t i = 0; i < params.count; ++i) {
+                const float offset = start + step * static_cast<float>(i);
+                releaseArrowOffset(ammo, bow, actor, params.damageMult, offset);
+            }
+        }
+
+        if (params.consume > 0) {
+            actor->UseAmmo(params.consume);
+        }
     }
 
     RE::BSEventNotifyControl ProcessEventHook::ProcessEvent_NPC(
