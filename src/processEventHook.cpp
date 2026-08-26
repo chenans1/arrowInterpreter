@@ -126,8 +126,8 @@ namespace arrow {
         }
 
         const auto params = process(payload);
-        log::info("[releaseArrow] dmg={} count={} spread={} consume={}", params.damageMult, params.count, params.spread,
-                  params.consume);
+        //log::info("[releaseArrow] dmg={} count={} spread={} consume={}", params.damageMult, params.count, params.spread,
+        //          params.consume);
         if (params.consume > 0) {
             const std::int32_t ammoCount = actor->GetInventoryItemCount(ammo);
 
@@ -148,17 +148,13 @@ namespace arrow {
             const float start = -(params.spread * 0.5f);
             for (std::uint32_t i = 0; i < params.count; ++i) {
                 const float offset = start + step * static_cast<float>(i);
+                //log::info("[releaseArrow]: fired w/ offset={}", offset);
                 releaseArrowOffset(ammo, bow, actor, params.damageMult, offset);
             }
         }
 
         if (params.consume > 0) {
             actor->UseAmmo(params.consume);
-            //test refresh player arrow count inventory
-            //if (actor->IsPlayerRef()) {
-            //    RE::SendUIMessage::SendInventoryUpdateMessage(actor, ammo);
-            //    log::info("[releaseArrow]: Attempted to update inventory");
-            //}
         }
     }
 
