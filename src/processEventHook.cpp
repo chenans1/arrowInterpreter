@@ -61,15 +61,18 @@ namespace arrow {
 
         if (weapon3D) {
             origin = weapon3D->world.translate;
-            rotation.x = actor->GetAimAngle();
-            rotation.z = actor->GetAimHeading();
+            //rotation.x = actor->GetAimAngle();
+            //rotation.z = actor->GetAimHeading();
         } else {
             origin = actor->GetPosition();
             origin.z += 96.0f;
-            rotation.x = actor->GetAimAngle();
-            rotation.z = actor->GetAimHeading();
+            //rotation.x = actor->GetAimAngle();
+            //rotation.z = actor->GetAimHeading();
             log::warn("[arrowInterpreter] No weapon/fire node; using actor fallback");
         }
+
+        rotation.x = actor->GetAimAngle();
+        rotation.z = actor->GetAimHeading();
         RE::ProjectileHandle handle;
         RE::Projectile::LaunchData launchData(actor, origin, rotation, ammo, weapon);
         launchData.autoAim = false;
@@ -98,8 +101,59 @@ namespace arrow {
         return true;
     }
 
-    static bool arrowRain() {
+    //releases arrow rain in a circle, hopefully. Idk lol
+    static bool ReleaseArrowRain(RE::TESAmmo* ammo, RE::TESObjectWEAP* weapon, RE::Actor* actor, float damageMult = 1.0f) {
+        if (!ammo || !weapon || !actor) {
+            log::info("[arrowInterpreter] invalid params for releaseArrow()");
+            return false;
+        }
 
+        auto* currentProcess = actor->GetActorRuntimeData().currentProcess;
+        if (!currentProcess) {
+            log::warn("[arrowInterpreter] Actor {:08X} has no current process", actor->GetFormID());
+            return false;
+        }
+        // fetches the weapon node, not sure if this is a good idea.
+        const auto& biped = actor->GetBiped2();
+        RE::NiAVObject* weapon3D = nullptr;
+
+        for (std::size_t i = 0; i < RE::BIPED_OBJECTS::kTotal; ++i) {
+            auto& object = biped->objects[i];
+            if (object.item == weapon && object.partClone) {
+                weapon3D = object.partClone.get();
+                break;
+            }
+        }
+        RE::NiPoint3 origin;
+        RE::Projectile::ProjectileRot rotation{};
+
+        if (weapon3D) {
+            origin = weapon3D->world.translate;
+        } else {
+            origin = actor->GetPosition();
+            origin.z += 96.0f;
+            log::warn("[arrowInterpreter] No weapon/fire node; using actor fallback");
+        }
+
+        rotation.x = -1.3962634f;  // -80 degrees
+        rotation.z = actor->GetAimHeading();
+
+        RE::ProjectileHandle handle;
+        RE::Projectile::LaunchData launchData(actor, origin, rotation, ammo, weapon);
+        launchData.autoAim = false;
+        launchData.desiredTarget = nullptr;
+        RE::Projectile::Launch(&handle, launchData);
+        auto projectile = handle.get();
+        if (!projectile) {
+            log::error("[arrowInterpreter] Failed to launch arrowRain for actor {:08X}", actor->GetFormID());
+            return false;
+        }
+        auto& projectileData = projectile->GetProjectileRuntimeData();
+        if (projectileData.power > 0.0f) {
+            projectileData.weaponDamage /= projectileData.power;
+            projectileData.power = 1.0f;
+            projectileData.weaponDamage *= damageMult;
+        }
     }
 
     //checks if it's our tag
@@ -112,7 +166,9 @@ namespace arrow {
 
         const auto& tag = a_event->tag;
         const auto& payload = a_event->payload;
-        if (tag != "arrowInterpreter"sv) { return; }
+        if (tag != "arrowInterpreter"sv && tag != "ArrowRain"sv) {
+            return;
+        }
         //process payload
         //check for actor equipped items - need equipped bow and arrows
         auto* equippedForm = actor->GetEquippedObject(false);
@@ -128,7 +184,12 @@ namespace arrow {
             log::info("[arrowInterpreter] Actor {:08X} has no ammunition equipped", actor->GetFormID());
             return;
         }
-
+        //tag is arrow rain
+        if (tag == "ArrowRain"sv) {
+            ReleaseArrowRain(ammo, bow, actor);
+            log::info("[arrowInterpreter] Actor {:08X} released arrow rain", actor->GetFormID());
+            return;
+        }
         const auto params = process(payload);
         //log::info("[releaseArrow] dmg={} count={} spread={} consume={}", params.damageMult, params.count, params.spread,
         //          params.consume);
