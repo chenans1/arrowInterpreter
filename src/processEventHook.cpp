@@ -73,7 +73,7 @@ namespace arrow {
         RE::ProjectileHandle handle;
         RE::Projectile::LaunchData launchData(actor, origin, rotation, ammo, weapon);
         launchData.autoAim = false;
-        launchData.desiredTarget = nullptr;
+        //launchData.desiredTarget = nullptr;
         RE::Projectile::Launch(&handle, launchData);
         auto projectile = handle.get();
         if (!projectile) {
@@ -98,7 +98,11 @@ namespace arrow {
         return true;
     }
 
-    //checks if it's out tag
+    static bool arrowRain() {
+
+    }
+
+    //checks if it's our tag
     static void HandleEvent(RE::BSAnimationGraphEvent* a_event) {
         if (!a_event || !a_event->holder || !a_event->tag.data()) return;
         auto* holder = const_cast<RE::TESObjectREFR*>(a_event->holder);
