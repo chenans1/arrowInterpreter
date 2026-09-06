@@ -1,13 +1,17 @@
 #pragma once
 
 namespace arrow {
-    class ProcessEventHook {
-    public:
-        struct ArrowData {
+    struct ArrowData {
             bool isArrowRain = false;
             float offset = {0.0f};
+            float targetForward = {760.0f};
+            float targetLateral = {0.0f};
+            float radius = {324.0f};
+            float apex = {512.0f};
+            float duration = {1.0f};
         };
-
+    class ProcessEventHook {
+    public:
         static void Install();
         static void InstallProjectileHook();
         static void AddPendingArrow(const RE::Projectile* a_projectile, ArrowData a_data);

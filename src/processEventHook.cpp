@@ -1,12 +1,21 @@
 #include "PCH.h"
 #include "processEventHook.h"
 #include "payload.h"
+#include <cmath>
+#include <numbers>
+#include <random>
 
 using namespace SKSE;
 using namespace SKSE::log;
 using namespace std::literals;
 
 namespace arrow {
+    static float randomFloat(float minimum, float maximum) {
+        static thread_local std::mt19937 generator{std::random_device{}()};
+        std::uniform_real_distribution<float> distribution{minimum, maximum};
+        return distribution(generator);
+    }
+
     //doing npcs and pcs
     void ProcessEventHook::Install() { 
         log::info("[processEventHook] Install ProcessEvent() Hook");
@@ -103,7 +112,7 @@ namespace arrow {
     }
 
     //releases arrow rain in a circle, hopefully. Idk lol
-    static bool ReleaseArrowRain(RE::TESAmmo* ammo, RE::TESObjectWEAP* weapon, RE::Actor* actor, float damageMult = 1.0f) {
+    static bool ReleaseArrowRain(RE::TESAmmo* ammo, RE::TESObjectWEAP* weapon, RE::Actor* actor, ArrowData a_data, float damageMult=1.0f) {
         if (!ammo || !weapon || !actor) {
             log::info("[arrowInterpreter] invalid params for releaseArrow()");
             return false;
@@ -154,9 +163,27 @@ namespace arrow {
             projectileData.weaponDamage /= projectileData.power;
             projectileData.power = 1.0f;
             projectileData.weaponDamage *= damageMult;
+            //projectileData.scale *= 2.0f;
         }
+        
+        if (a_data.radius > 0.0f) {
+            const float angle = randomFloat(0.0f, 2.0f * 3.1415926f);
+            const float offset_radius = a_data.radius * std::sqrt(randomFloat(0.0f, 1.0f));
 
-        ProcessEventHook::AddPendingArrow(projectile.get(), {.isArrowRain = true});
+            const float forwardOffset = offset_radius * std::cosf(angle) * 1.2f;
+            const float lateralOffset = offset_radius * std::sinf(angle) * 0.42f;
+            ProcessEventHook::AddPendingArrow(
+                projectile.get(),
+                {
+                    .isArrowRain = true,
+                    .targetForward = a_data.targetForward + forwardOffset,
+                    .targetLateral = lateralOffset,
+                    .apex = a_data.apex,
+                    .duration = a_data.duration
+                });
+        } else {
+            ProcessEventHook::AddPendingArrow(projectile.get(), a_data);
+        }
         return true;
     }
 
@@ -190,8 +217,11 @@ namespace arrow {
         }
         //tag is arrow rain
         if (tag == "ArrowRain"sv) {
-            ReleaseArrowRain(ammo, bow, actor);
-            log::info("[arrowInterpreter] Actor {:08X} released arrow rain", actor->GetFormID());
+            // log::info("[arrowInterpreter] Actor {:08X} released arrow rain", actor->GetFormID());
+            ReleaseArrowRain(ammo, bow, actor, {.isArrowRain=true,.radius = 0.0f}, 0.33f);
+            for (std::uint32_t i = 0; i < 10; ++i) {
+                ReleaseArrowRain(ammo, bow, actor, {.isArrowRain=true}, 0.33f);
+            }
             return;
         }
         const auto params = process(payload);
@@ -253,10 +283,11 @@ namespace arrow {
 
     static bool calculateNewVelocity(
         RE::Projectile* projectile,
-        float horizontalTravelDistance,
+        float targetForward,
+        float targetLateral,
         float apexHeight,
         float flightTime) {
-        if (!projectile || horizontalTravelDistance <= 0.0f || apexHeight <= 0.0f || flightTime <= 0.0f) {
+        if (!projectile || targetForward <= 0.0f || apexHeight <= 0.0f || flightTime <= 0.0f) {
             return false;
         }
         //matching the values reverse engineered by smoothcam
@@ -310,7 +341,7 @@ namespace arrow {
             actualGravity,
             requiredGravityMultiplier,
             projectileData.power);
-
+        
         auto& velocity = projectileData.linearVelocity;
         const float oldHorizontalSpeed = std::hypot(velocity.x, velocity.y);
         if (oldHorizontalSpeed <= 0.001f) {
@@ -318,13 +349,15 @@ namespace arrow {
         }
         const float forwardX = velocity.x / oldHorizontalSpeed;
         const float forwardY = velocity.y / oldHorizontalSpeed;
+        const float rightX = forwardY;
+        const float rightY = -forwardX;
 
-        const float horizontalSpeed = horizontalTravelDistance / flightTime;
-        const float verticalSpeed = 4.0f * apexHeight / flightTime;
+        const float displacementX = forwardX * targetForward + rightX * targetLateral;
+        const float displacementY = forwardY * targetForward + rightY * targetLateral;
 
-        velocity.x = forwardX * horizontalSpeed;
-        velocity.y = forwardY * horizontalSpeed;
-        velocity.z = verticalSpeed;
+        velocity.x = displacementX / flightTime;
+        velocity.y = displacementY / flightTime;
+        velocity.z = 4.0f * apexHeight / flightTime;
         log::info("[arrowInterpreter] Arrow rain velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
         return true;
     }
@@ -352,8 +385,13 @@ namespace arrow {
         const float y = velocity.y;
         if (pending.isArrowRain) {
             log::info("[arrowInterpreter] arrowRain Before velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
-            calculateNewVelocity(a_this, 762.0f, 512.0f, 0.66f);
-
+            calculateNewVelocity(
+                a_this,
+                pending.targetForward,
+                pending.targetLateral,
+                pending.apex,
+                pending.duration);
+        
         } else {
             const float c = std::cos(offset);
             const float s = std::sin(offset);
