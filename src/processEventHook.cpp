@@ -90,8 +90,9 @@ namespace arrow {
             projectileData.weaponDamage *= damageMult;
         }
         //log::info("offset deg={}, offset rad={}",offset, RE::deg_to_rad(offset));
+
         if (offset != 0.0f) {
-            ProcessEventHook::AddPendingArrow(projectile.get(), RE::deg_to_rad(offset));
+            ProcessEventHook::AddPendingArrow(projectile.get(), {.offset = RE::deg_to_rad(offset)});
         }
         //auto point = projectile->GetAngle();
         //log::info("[arrowInterpreter] Original Angle=({}, {}, {})", point.x, point.y, point.z);
@@ -135,7 +136,7 @@ namespace arrow {
             log::warn("[arrowInterpreter] No weapon/fire node; using actor fallback");
         }
 
-        rotation.x = -1.3962634f;  // -80 degrees
+        rotation.x = actor->GetAimAngle(); 
         rotation.z = actor->GetAimHeading();
 
         RE::ProjectileHandle handle;
@@ -151,9 +152,12 @@ namespace arrow {
         auto& projectileData = projectile->GetProjectileRuntimeData();
         if (projectileData.power > 0.0f) {
             projectileData.weaponDamage /= projectileData.power;
-            projectileData.power = 1.0f;
+            projectileData.power = 0.50f;
             projectileData.weaponDamage *= damageMult;
         }
+
+        ProcessEventHook::AddPendingArrow(projectile.get(), {.isArrowRain = true});
+        return true;
     }
 
     //checks if it's our tag
@@ -241,9 +245,9 @@ namespace arrow {
         return _originalPC(a_sink, a_event, a_eventSource);
     }
 
-    void ProcessEventHook::AddPendingArrow(const RE::Projectile* a_projectile, float a_offset) {
+    void ProcessEventHook::AddPendingArrow(const RE::Projectile* a_projectile, ArrowData a_data) {
         std::scoped_lock lock(pendingArrowsMutex);
-        pendingArrows.emplace(a_projectile, a_offset);
+        pendingArrows.emplace(a_projectile, a_data);
         //log::info("[arrowInterpreter] Stored Arrow");
     }
 
@@ -252,6 +256,7 @@ namespace arrow {
         //log::info("[arrowInterpreter] Init Hook ran");
         //log::info("[arrowInterpreter] Init ptr={}, pending={}", static_cast<void*>(a_this), it != pendingArrows.end());
         float offset = 0.0f;
+        ArrowData pending{};
         {
             std::scoped_lock lock(pendingArrowsMutex);
 
@@ -260,9 +265,10 @@ namespace arrow {
                 return;
             }
 
-            offset = it->second;
+            pending = it->second;
             pendingArrows.erase(it);
         }
+        offset = pending.offset;
         auto& velocity = a_this->GetProjectileRuntimeData().linearVelocity;
 
         const float c = std::cos(offset);
@@ -270,18 +276,37 @@ namespace arrow {
 
         const float x = velocity.x;
         const float y = velocity.y;
-        //log::info("[arrowInterpreter] Before velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
 
-        velocity.x = x * c - y * s;
-        velocity.y = x * s + y * c;
-        //log::info("[arrowInterpreter] Modified velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
+        if (pending.isArrowRain) {
+            log::info("[arrowInterpreter] arrowRain Before velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
+            //test: force the arrow to pitch upwards at 60 deg, with the same velocity.
+            const float elevation = RE::deg_to_rad(72.0f);
+            const float speed = velocity.Length();
+            const float horizontalLength = std::sqrt(x * x + y * y);
+            const float horizontalSpeed = speed * std::cos(elevation);
+
+            if (horizontalLength > 0.001f) {
+                velocity.x = (x / horizontalLength) * horizontalSpeed;
+                velocity.y = (y / horizontalLength) * horizontalSpeed;
+            } else {
+                velocity.x = 0.0f;
+                velocity.y = 0.0f;
+            }
+            velocity.z = speed * std::sin(elevation);
+            log::info("[arrowInterpreter] Arrow rain velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
+        } else {
+            velocity.x = x * c - y * s;
+            velocity.y = x * s + y * c;
+            //log::info("[arrowInterpreter] Modified velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
+            
+            // modify proj rotation visually
+            auto point = a_this->GetAngle();
+            //log::info("[arrowInterpreter] Original Angle=({}, {}, {})", point.x, point.y, point.z);
+            point.z -= offset;
+            a_this->SetAngle(point);
+            //log::info("[arrowInterpreter] Original Angle=({}, {}, {})", 
+            //    a_this->GetAngle().x, a_this->GetAngle().y,a_this->GetAngle().z);
+        }
         
-        // modify proj rotation visually
-        auto point = a_this->GetAngle();
-        //log::info("[arrowInterpreter] Original Angle=({}, {}, {})", point.x, point.y, point.z);
-        point.z -= offset;
-        a_this->SetAngle(point);
-        //log::info("[arrowInterpreter] Original Angle=({}, {}, {})", 
-        //    a_this->GetAngle().x, a_this->GetAngle().y,a_this->GetAngle().z);
     }
 }
