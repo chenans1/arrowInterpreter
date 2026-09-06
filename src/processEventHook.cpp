@@ -251,11 +251,15 @@ namespace arrow {
         //log::info("[arrowInterpreter] Stored Arrow");
     }
 
-    static bool calculateNewVelocity(RE::Projectile* projectile, float horizontalTravelDistance, float apexHeight) {
-        if (!projectile || horizontalTravelDistance <= 0.0f) {
+    static bool calculateNewVelocity(
+        RE::Projectile* projectile,
+        float horizontalTravelDistance,
+        float apexHeight,
+        float flightTime) {
+        if (!projectile || horizontalTravelDistance <= 0.0f || apexHeight <= 0.0f || flightTime <= 0.0f) {
             return false;
         }
-        //matching the values calcualted by smoothcam
+        //matching the values reverse engineered by smoothcam
         constexpr float havokToGameUnits = 59.0f;
         float worldGravityZ = -9.8f;
         if (auto* cell = projectile->GetParentCell()) {
@@ -272,14 +276,41 @@ namespace arrow {
         }
 
         auto& projectileData = projectile->GetProjectileRuntimeData();
-        projectileData.power = -2.0f;
-        const float ProjGravity = std::abs(worldGravityZ) * projectileBase->data.gravity * havokToGameUnits;
-        const float gravity = std::abs(worldGravityZ) * projectile->GetGravity() * havokToGameUnits;
+        auto* gameSettings = RE::GameSettingCollection::GetSingleton();
+        auto* weakGravitySetting = gameSettings ? gameSettings->GetSetting("fArrowWeakGravity") : nullptr;
+        if (!weakGravitySetting) {
+            log::warn("[arrowInterpreter] Could not read fArrowWeakGravity");
+            return false;
+        }
 
-        // if (gravity <= 0.0f) {
-        //     return false;
-        // }
-        log::info("[arrowInterpreter] arrowRain gravity = {}, projGrav = {}", gravity, ProjGravity);
+        // For a same-height parabola with a requested apex and duration: apexHeight = gravity * flightTime^2 / 8
+        // GetGravity() returns a multiplier applied to Havok gravity and the 59 game-unit conversion, so solve for that multiplier first.
+        const float requiredGravity = 8.0f * apexHeight / (flightTime * flightTime);
+        const float gravityUnit = std::abs(worldGravityZ) * havokToGameUnits;
+        if (gravityUnit <= 0.0f) {
+            return false;
+        }
+
+        const float requiredGravityMultiplier = requiredGravity / gravityUnit;
+        const float weakGravity = weakGravitySetting->GetFloat();
+        const float recordGravity = projectileBase->data.gravity;
+        const float gravityRange = weakGravity - recordGravity;
+        if (std::abs(gravityRange) <= 0.000001f) {
+            return false;
+        }
+
+        // ArrowProjectile::GetGravity(): weakGravity - ((weakGravity - recordGravity) * power) from ghidra, so use neg values to tune grav
+        projectileData.power = (weakGravity - requiredGravityMultiplier) / gravityRange;
+
+        const float actualGravity =
+            std::abs(worldGravityZ) * projectile->GetGravity() * havokToGameUnits;
+        log::info(
+            "[arrowInterpreter] arrowRain gravity requested={}, actual={}, multiplier={}, power={}",
+            requiredGravity,
+            actualGravity,
+            requiredGravityMultiplier,
+            projectileData.power);
+
         auto& velocity = projectileData.linearVelocity;
         const float oldHorizontalSpeed = std::hypot(velocity.x, velocity.y);
         if (oldHorizontalSpeed <= 0.001f) {
@@ -288,11 +319,8 @@ namespace arrow {
         const float forwardX = velocity.x / oldHorizontalSpeed;
         const float forwardY = velocity.y / oldHorizontalSpeed;
 
-        const float verticalSpeed = std::sqrt(2.0f * gravity * apexHeight);
-
-        const float flightTime = 2.0f * verticalSpeed / gravity;
-
         const float horizontalSpeed = horizontalTravelDistance / flightTime;
+        const float verticalSpeed = 4.0f * apexHeight / flightTime;
 
         velocity.x = forwardX * horizontalSpeed;
         velocity.y = forwardY * horizontalSpeed;
@@ -324,24 +352,7 @@ namespace arrow {
         const float y = velocity.y;
         if (pending.isArrowRain) {
             log::info("[arrowInterpreter] arrowRain Before velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
-            //test: force the arrow to pitch upwards at 60 deg, with the same velocity.
-            // const float elevation = RE::deg_to_rad(72.0f);
-            // const float speed = velocity.Length();
-            // const float horizontalLength = std::sqrt(x * x + y * y);
-            // const float horizontalSpeed = speed * std::cos(elevation);
-
-            // if (horizontalLength > 0.001f) {
-            //     velocity.x = (x / horizontalLength) * horizontalSpeed;
-            //     velocity.y = (y / horizontalLength) * horizontalSpeed;
-            // } else {
-            //     velocity.x = 0.0f;
-            //     velocity.y = 0.0f;
-            // }
-            // velocity.z = speed * std::sin(elevation) * 0.5f;
-            // log::info("[arrowInterpreter] Arrow rain velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
-
-            //test the no gravity mod arrow rain
-            calculateNewVelocity(a_this, 762.0f, 256.0f);
+            calculateNewVelocity(a_this, 762.0f, 512.0f, 0.66f);
 
         } else {
             const float c = std::cos(offset);
