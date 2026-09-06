@@ -181,6 +181,7 @@ namespace arrow {
         RE::Projectile::LaunchData launchData(actor, origin, rotation, ammo, weapon);
         launchData.autoAim = false;
         launchData.desiredTarget = nullptr;
+        launchData.alwaysHit = true;
         RE::Projectile::Launch(&handle, launchData);
         auto projectile = handle.get();
         if (!projectile) {
@@ -192,6 +193,7 @@ namespace arrow {
             projectileData.weaponDamage /= projectileData.power;
             projectileData.power = 1.0f;
             projectileData.weaponDamage *= damageMult;
+            projectileData.flags.set(RE::Projectile::Flags::kDestroyAfterHit);
             //projectileData.scale *= 2.0f;
         }
         
@@ -248,7 +250,7 @@ namespace arrow {
         if (tag == "ArrowRain"sv) {
             // log::info("[arrowInterpreter] Actor {:08X} released arrow rain", actor->GetFormID());
             ReleaseArrowRain(ammo, bow, actor, {.isArrowRain=true,.radius = 0.0f}, 0.33f);
-            for (std::uint32_t i = 0; i < 10; ++i) {
+            for (std::uint32_t i = 0; i < 14; ++i) {
                 ReleaseArrowRain(ammo, bow, actor, {.isArrowRain=true}, 0.33f);
             }
             return;
@@ -394,15 +396,14 @@ namespace arrow {
 
         // ArrowProjectile::GetGravity(): weakGravity - ((weakGravity - recordGravity) * power) from ghidra, so use neg values to tune grav
         projectileData.power = (weakGravity - requiredGravityMultiplier) / gravityRange;
-
-        const float actualGravity =
-            std::abs(worldGravityZ) * projectile->GetGravity() * havokToGameUnits;
-        log::info(
-            "[arrowInterpreter] arrowRain gravity requested={}, actual={}, multiplier={}, power={}",
-            requiredGravity,
-            actualGravity,
-            requiredGravityMultiplier,
-            projectileData.power);
+        projectileData.flags.set(RE::Projectile::Flags::kDestroyAfterHit);
+        const float actualGravity = std::abs(worldGravityZ) * projectile->GetGravity() * havokToGameUnits;
+        // log::info(
+        //     "[arrowInterpreter] arrowRain gravity requested={}, actual={}, multiplier={}, power={}",
+        //     requiredGravity,
+        //     actualGravity,
+        //     requiredGravityMultiplier,
+        //     projectileData.power);
         
         auto& velocity = projectileData.linearVelocity;
         const float oldHorizontalSpeed = std::hypot(velocity.x, velocity.y);
@@ -420,7 +421,7 @@ namespace arrow {
         velocity.x = displacementX / flightTime;
         velocity.y = displacementY / flightTime;
         velocity.z = 4.0f * apexHeight / flightTime;
-        log::info("[arrowInterpreter] Arrow rain velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
+        // log::info("[arrowInterpreter] Arrow rain velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
         return true;
     }
 

@@ -6,7 +6,7 @@ namespace arrow {
             float offset = {0.0f};
             float targetForward = {1024.0f};
             float targetLateral = {0.0f};
-            float radius = {512.0f};
+            float radius = {312.0f};
             float apex = {512.0f};
             float duration = {1.2f};
         };
