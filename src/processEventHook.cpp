@@ -1,6 +1,8 @@
 #include "PCH.h"
 #include "processEventHook.h"
 #include "payload.h"
+#include "RE/A/ArrowProjectile.h"
+#include "RE/B/BGSProjectile.h"
 #include <cmath>
 #include <numbers>
 #include <random>
@@ -10,6 +12,30 @@ using namespace SKSE::log;
 using namespace std::literals;
 
 namespace arrow {
+    namespace {
+        constexpr float arrowRainCollisionRadius = 32.0f;
+
+        class CollisionRadiusRestore {
+        public:
+            explicit CollisionRadiusRestore(RE::BGSProjectile* a_projectile) :
+                projectile(a_projectile),
+                collisionRadius(a_projectile->data.collisionRadius)
+            {}
+
+            ~CollisionRadiusRestore() {
+                projectile->data.collisionRadius = collisionRadius;
+            }
+
+            CollisionRadiusRestore(const CollisionRadiusRestore&) = delete;
+            CollisionRadiusRestore& operator=(const CollisionRadiusRestore&) = delete;
+
+        private:
+            RE::BGSProjectile* projectile;
+            float collisionRadius;
+        };
+
+    }
+
     static float randomFloat(float minimum, float maximum) {
         static thread_local std::mt19937 generator{std::random_device{}()};
         std::uniform_real_distribution<float> distribution{minimum, maximum};
@@ -38,6 +64,9 @@ namespace arrow {
         REL::Relocation<std::uintptr_t> hook{RELOCATION_ID(43030, 44222)};
 
         _InitProjectile = trampoline.write_call<5>(hook.address() + REL::Relocate(0x3B8, 0x78A), InitProjectile);
+
+        REL::Relocation<std::uintptr_t> arrowProjectileVtable{RE::VTABLE_ArrowProjectile[0]};
+        _GetCollisionShape = arrowProjectileVtable.write_vfunc(0xBC, GetCollisionShape);
         log::info("[processEventHook] ...Projectile hook installed");
     }
 
@@ -279,6 +308,39 @@ namespace arrow {
         std::scoped_lock lock(pendingArrowsMutex);
         pendingArrows.emplace(a_projectile, a_data);
         //log::info("[arrowInterpreter] Stored Arrow");
+    }
+
+    RE::bhkShape* ProcessEventHook::GetCollisionShape(RE::Projectile* a_this) {
+        // All ArrowProjectile calls take this lock so an ordinary arrow cannot enter the
+        // original function while an arrow-rain call has temporarily changed its base radius.
+        std::scoped_lock collisionLock(collisionShapeMutex);
+
+        bool isArrowRain = false;
+        {
+            std::scoped_lock pendingLock(pendingArrowsMutex);
+            const auto it = pendingArrows.find(a_this);
+            isArrowRain = it != pendingArrows.end() && it->second.isArrowRain;
+        }
+
+        if (!isArrowRain) {
+            return _GetCollisionShape(a_this);
+        }
+
+        auto* projectileBase = a_this->GetProjectileBase();
+        if (!projectileBase) {
+            return _GetCollisionShape(a_this);
+        }
+
+        CollisionRadiusRestore restore(projectileBase);
+        projectileBase->data.collisionRadius = arrowRainCollisionRadius;
+
+        auto* shape = _GetCollisionShape(a_this);
+        log::info(
+            "[arrowInterpreter] GetCollisionShape ptr={}, base={:08X}, radius={}",
+            static_cast<void*>(a_this),
+            projectileBase->GetFormID(),
+            projectileBase->data.collisionRadius);
+        return shape;
     }
 
     static bool calculateNewVelocity(

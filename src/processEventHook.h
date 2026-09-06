@@ -4,11 +4,11 @@ namespace arrow {
     struct ArrowData {
             bool isArrowRain = false;
             float offset = {0.0f};
-            float targetForward = {760.0f};
+            float targetForward = {1024.0f};
             float targetLateral = {0.0f};
-            float radius = {324.0f};
+            float radius = {512.0f};
             float apex = {512.0f};
-            float duration = {1.0f};
+            float duration = {1.2f};
         };
     class ProcessEventHook {
     public:
@@ -33,9 +33,13 @@ namespace arrow {
         //used to detect the arrows that are fired. 
         static inline std::unordered_map<const RE::Projectile*, ArrowData> pendingArrows;
         static inline std::mutex pendingArrowsMutex;
+        static inline std::mutex collisionShapeMutex;
 
         static void InitProjectile(RE::Projectile* a_this);
         static inline REL::Relocation<decltype(InitProjectile)> _InitProjectile;
+
+        static RE::bhkShape* GetCollisionShape(RE::Projectile* a_this);
+        static inline REL::Relocation<decltype(GetCollisionShape)> _GetCollisionShape;
 
     };
 }
