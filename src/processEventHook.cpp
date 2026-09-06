@@ -152,7 +152,7 @@ namespace arrow {
         auto& projectileData = projectile->GetProjectileRuntimeData();
         if (projectileData.power > 0.0f) {
             projectileData.weaponDamage /= projectileData.power;
-            projectileData.power = 0.50f;
+            projectileData.power = 1.0f;
             projectileData.weaponDamage *= damageMult;
         }
 
@@ -251,6 +251,56 @@ namespace arrow {
         //log::info("[arrowInterpreter] Stored Arrow");
     }
 
+    static bool calculateNewVelocity(RE::Projectile* projectile, float horizontalTravelDistance, float apexHeight) {
+        if (!projectile || horizontalTravelDistance <= 0.0f) {
+            return false;
+        }
+        //matching the values calcualted by smoothcam
+        constexpr float havokToGameUnits = 59.0f;
+        float worldGravityZ = -9.8f;
+        if (auto* cell = projectile->GetParentCell()) {
+            if (auto* bhkWorld = cell->GetbhkWorld()) {
+                if (auto* world = bhkWorld->GetWorld1()) {
+                    worldGravityZ = world->gravity.quad.m128_f32[2];
+                }
+            }
+        }
+
+        auto* projectileBase = projectile->GetProjectileBase();
+        if (!projectileBase) {
+            return false;
+        }
+
+        auto& projectileData = projectile->GetProjectileRuntimeData();
+        projectileData.power = -2.0f;
+        const float ProjGravity = std::abs(worldGravityZ) * projectileBase->data.gravity * havokToGameUnits;
+        const float gravity = std::abs(worldGravityZ) * projectile->GetGravity() * havokToGameUnits;
+
+        // if (gravity <= 0.0f) {
+        //     return false;
+        // }
+        log::info("[arrowInterpreter] arrowRain gravity = {}, projGrav = {}", gravity, ProjGravity);
+        auto& velocity = projectileData.linearVelocity;
+        const float oldHorizontalSpeed = std::hypot(velocity.x, velocity.y);
+        if (oldHorizontalSpeed <= 0.001f) {
+            return false;
+        }
+        const float forwardX = velocity.x / oldHorizontalSpeed;
+        const float forwardY = velocity.y / oldHorizontalSpeed;
+
+        const float verticalSpeed = std::sqrt(2.0f * gravity * apexHeight);
+
+        const float flightTime = 2.0f * verticalSpeed / gravity;
+
+        const float horizontalSpeed = horizontalTravelDistance / flightTime;
+
+        velocity.x = forwardX * horizontalSpeed;
+        velocity.y = forwardY * horizontalSpeed;
+        velocity.z = verticalSpeed;
+        log::info("[arrowInterpreter] Arrow rain velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
+        return true;
+    }
+
     void ProcessEventHook::InitProjectile(RE::Projectile* a_this) { 
         _InitProjectile(a_this);
         //log::info("[arrowInterpreter] Init Hook ran");
@@ -270,31 +320,32 @@ namespace arrow {
         }
         offset = pending.offset;
         auto& velocity = a_this->GetProjectileRuntimeData().linearVelocity;
-
-        const float c = std::cos(offset);
-        const float s = std::sin(offset);
-
         const float x = velocity.x;
         const float y = velocity.y;
-
         if (pending.isArrowRain) {
             log::info("[arrowInterpreter] arrowRain Before velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
             //test: force the arrow to pitch upwards at 60 deg, with the same velocity.
-            const float elevation = RE::deg_to_rad(72.0f);
-            const float speed = velocity.Length();
-            const float horizontalLength = std::sqrt(x * x + y * y);
-            const float horizontalSpeed = speed * std::cos(elevation);
+            // const float elevation = RE::deg_to_rad(72.0f);
+            // const float speed = velocity.Length();
+            // const float horizontalLength = std::sqrt(x * x + y * y);
+            // const float horizontalSpeed = speed * std::cos(elevation);
 
-            if (horizontalLength > 0.001f) {
-                velocity.x = (x / horizontalLength) * horizontalSpeed;
-                velocity.y = (y / horizontalLength) * horizontalSpeed;
-            } else {
-                velocity.x = 0.0f;
-                velocity.y = 0.0f;
-            }
-            velocity.z = speed * std::sin(elevation);
-            log::info("[arrowInterpreter] Arrow rain velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
+            // if (horizontalLength > 0.001f) {
+            //     velocity.x = (x / horizontalLength) * horizontalSpeed;
+            //     velocity.y = (y / horizontalLength) * horizontalSpeed;
+            // } else {
+            //     velocity.x = 0.0f;
+            //     velocity.y = 0.0f;
+            // }
+            // velocity.z = speed * std::sin(elevation) * 0.5f;
+            // log::info("[arrowInterpreter] Arrow rain velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
+
+            //test the no gravity mod arrow rain
+            calculateNewVelocity(a_this, 762.0f, 256.0f);
+
         } else {
+            const float c = std::cos(offset);
+            const float s = std::sin(offset);
             velocity.x = x * c - y * s;
             velocity.y = x * s + y * c;
             //log::info("[arrowInterpreter] Modified velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
