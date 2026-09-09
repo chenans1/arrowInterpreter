@@ -5,6 +5,7 @@
 #include <spdlog/sinks/msvc_sink.h>
 
 #include "processEventHook.h"
+#include "arrowHook.h"
 
 using namespace SKSE;
 using namespace SKSE::log;
@@ -45,6 +46,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* skse) {
     log::info("{} {} is loading...", plugin->GetName(), version);
     SKSE::Init(skse);
     arrow::ProcessEventHook::Install();
+    arrowHook::Install();
     SKSE::AllocTrampoline(14);
     SKSE::GetMessagingInterface()->RegisterListener([](SKSE::MessagingInterface::Message* msg) {
         if (msg->type == SKSE::MessagingInterface::kPostLoad) {

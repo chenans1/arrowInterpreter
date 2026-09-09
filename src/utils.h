@@ -17,7 +17,7 @@ namespace utils {
                 !actor->Is3DLoaded()) {
                 return RE::BSContainer::ForEachResult::kContinue;
             }
-
+            SKSE::log::info( "[Utils] added={:08X} to actorsVec", actor ? actor->GetFormID() : 0);
             actors.emplace_back(actor->GetHandle());
             return RE::BSContainer::ForEachResult::kContinue;
         });

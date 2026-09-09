@@ -26,6 +26,7 @@ set(SOURCES
     src/payload.h
     src/payload.cpp
     src/utils.h
+    src/arrowHook.h
 )
 
 add_commonlibsse_plugin(${PROJECT_NAME} SOURCES ${SOURCES}) # <--- specifies plugin.cpp

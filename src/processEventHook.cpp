@@ -25,7 +25,7 @@ namespace arrow {
 
         _originalNPC = vtblNPC.write_vfunc(0x1, ProcessEvent_NPC);
         _originalPC = vtblPC.write_vfunc(0x1, ProcessEvent_PC);
-
+        
         log::info("[processEventHook] ...ProcessEvent hook installed");
     }
 
@@ -38,6 +38,9 @@ namespace arrow {
         REL::Relocation<std::uintptr_t> hook{RELOCATION_ID(43030, 44222)};
 
         _InitProjectile = trampoline.write_call<5>(hook.address() + REL::Relocate(0x3B8, 0x78A), InitProjectile);
+        
+
+        
         log::info("[processEventHook] ...Projectile hook installed");
     }
 
