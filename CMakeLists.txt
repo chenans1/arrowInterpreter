@@ -19,6 +19,8 @@ include(extern/CommonLibVR-ng/cmake/CommonLibSSE.cmake)
 
 set(SOURCES
     src/plugin.cpp
+    src/hitDataAPI.h
+    src/hitDataAPI.cpp
     src/processEventHook.h
     src/processEventHook.cpp
     src/payload.h
