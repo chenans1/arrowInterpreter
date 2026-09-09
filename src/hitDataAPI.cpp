@@ -2,7 +2,7 @@
 #include "hitDataAPI.h"
 #include <cstddef>
 
-namespace arrow::hit_data
+namespace arrow
 {
 	namespace
 	{

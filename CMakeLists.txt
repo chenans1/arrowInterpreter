@@ -25,6 +25,7 @@ set(SOURCES
     src/processEventHook.cpp
     src/payload.h
     src/payload.cpp
+    src/utils.h
 )
 
 add_commonlibsse_plugin(${PROJECT_NAME} SOURCES ${SOURCES}) # <--- specifies plugin.cpp
