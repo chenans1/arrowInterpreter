@@ -40,7 +40,7 @@ namespace arrow {
         _InitProjectile = trampoline.write_call<5>(hook.address() + REL::Relocate(0x3B8, 0x78A), InitProjectile);
         
 
-        
+
         log::info("[processEventHook] ...Projectile hook installed");
     }
 
@@ -222,9 +222,9 @@ namespace arrow {
         if (tag == "ArrowRain"sv) {
             // log::info("[arrowInterpreter] Actor {:08X} released arrow rain", actor->GetFormID());
             ReleaseArrowRain(ammo, bow, actor, {.isArrowRain=true,.radius = 0.0f}, 0.33f);
-            for (std::uint32_t i = 0; i < 10; ++i) {
-                ReleaseArrowRain(ammo, bow, actor, {.isArrowRain=true}, 0.33f);
-            }
+            // for (std::uint32_t i = 0; i < 10; ++i) {
+            //     ReleaseArrowRain(ammo, bow, actor, {.isArrowRain=true}, 0.33f);
+            // }
             return;
         }
         const auto params = process(payload);

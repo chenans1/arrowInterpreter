@@ -10,6 +10,7 @@ class arrowHook{
             _original = vtable.write_vfunc(0xBD, AddImpact);
             SKSE::log::info("[ArrowImpactHook] Installed");
         }
+
     private:
         static void AddImpact(
             RE::ArrowProjectile* a_projectile, RE::TESObjectREFR* a_ref, const RE::NiPoint3& a_targetLoc, const RE::NiPoint3& a_velocity, RE::hkpCollidable* a_collidable, std::int32_t a_arg6, std::uint32_t a_arg7) {
@@ -18,19 +19,25 @@ class arrowHook{
             SKSE::log::info(
             "[ArrowImpactHook] impact ref={:08X}, position=({}, {}, {})",
                 a_ref ? a_ref->GetFormID() : 0, impactPoint.x, impactPoint.y, impactPoint.z);
-            const std::vector<RE::ActorHandle> actorsVec = utils::FindActorsNearImpact(a_projectile, impactPoint, 324.0f);
+            const std::vector<RE::ActorHandle> actorsVec = utils::FindActorsNearImpact(a_projectile, impactPoint, 512.0f);
             const auto* directlyHitActor = a_ref ? a_ref->As<RE::Actor>() : nullptr;
-
+            const auto shooter = a_projectile ->GetProjectileRuntimeData().shooter.get();
             for (const auto& actorHandle : actorsVec) {     
                 auto actor = actorHandle.get();
                 if (!actor) {
+                    SKSE::log::info("[ArrowImpactHook] AddImpact: invalid actor");
                     continue;
                 }
                 if (actor.get() == directlyHitActor) {
+                    SKSE::log::info("[ArrowImpactHook] AddImpact: Skip direct target {:08X}", actor->GetFormID());
                     continue;
                 }
-                if (actor) {
-                    arrow::ApplyArrowHit(a_projectile, actor.get());
+                if (shooter && actor.get() == shooter.get()) {
+                    SKSE::log::info("[ArrowImpactHook] AddImpact: Skipping shooter {:08X}", actor->GetFormID());
+                    continue;
+                }
+                if (!arrow::ApplyArrowHit(a_projectile, actor.get())) {
+                    SKSE::log::warn("[ArrowImpactHook] Failed radial hit for {:08X}", actor->GetFormID());
                 }
             }
         }
