@@ -14,11 +14,10 @@ namespace arrow
 		using ApplyHitData = void (*)(RE::Actor*, RE::HitData*);
 		using HitDataDestructor = void (*)(RE::HitData*);
 
-		//AE Address Library IDs
-		REL::Relocation<HitDataConstructor> constructHitData{ REL::ID(43995) };
-		REL::Relocation<HitDataDestructor> destroyHitData{ REL::ID(43997) };
-		REL::Relocation<InitializeArrowData> initializeArrowData{ REL::ID(44002) };
-		REL::Relocation<ApplyHitData> applyHitData{ REL::ID(38586) };
+		REL::Relocation<HitDataConstructor> constructHitData{ RELOCATION_ID(42826, 43995) };
+		REL::Relocation<HitDataDestructor> destroyHitData{ RELOCATION_ID(42828, 43997) };
+		REL::Relocation<InitializeArrowData> initializeArrowData{ RELOCATION_ID(42833, 44002) };
+		REL::Relocation<ApplyHitData> applyHitData{ REL::ID(38586) }; //need to be double checked?
 	}
 
 	bool ApplyArrowHit(RE::Projectile* a_projectile, RE::Actor* a_target)
@@ -38,10 +37,10 @@ namespace arrow
 
 		//The vanilla projectile path passes a null aggressor here. The initializer recovers the shooter, weapon and damage from the projectile.
 		initializeArrowData(hitData, nullptr, a_target, a_projectile);
-		log::info("[hitDataAPI] ApplyArrowHit initialized arrow hitData off");
+		log::info("[hitDataAPI] Initialized hitData");
 		applyHitData(a_target, hitData);
 		destroyHitData(hitData);
-		log::info("[hitDataAPI] ApplyArrowHit applied hitdata");
+		log::info("[hitDataAPI] Applied HitData");
 		return true;
 	}
 }
