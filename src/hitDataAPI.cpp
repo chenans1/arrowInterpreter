@@ -1,6 +1,8 @@
 #include "PCH.h"
 #include "hitDataAPI.h"
 #include <cstddef>
+#include "processEventHook.h"
+
 using namespace SKSE;
 using namespace SKSE::log;
 using namespace std::literals;
@@ -25,22 +27,18 @@ namespace arrow
 		if (!a_projectile || !a_target) {
 			return false;
 		}
-
-		if (!REL::Module::IsAE()) {
-			log::error("[hitDataAPI] ApplyArrowHit called on an unsupported non-AE runtime");
-			return false;
-		}
-
+		
 		alignas(RE::HitData) std::byte storage[sizeof(RE::HitData)];
 		auto* hitData = reinterpret_cast<RE::HitData*>(storage);
 		constructHitData(hitData);
-
+		
 		//The vanilla projectile path passes a null aggressor here. The initializer recovers the shooter, weapon and damage from the projectile.
 		initializeArrowData(hitData, nullptr, a_target, a_projectile);
-		log::info("[hitDataAPI] Initialized hitData");
+		// log::info("[hitDataAPI] Initialized hitData");
 		applyHitData(a_target, hitData);
 		destroyHitData(hitData);
-		log::info("[hitDataAPI] Applied HitData");
+		// log::info("[hitDataAPI] Applied HitData");
+		// a_projectile->Kill();
 		return true;
 	}
 }
