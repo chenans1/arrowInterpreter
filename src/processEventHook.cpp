@@ -25,7 +25,9 @@ namespace arrow {
 
         _originalNPC = vtblNPC.write_vfunc(0x1, ProcessEvent_NPC);
         _originalPC = vtblPC.write_vfunc(0x1, ProcessEvent_PC);
-        
+
+        REL::Relocation<std::uintptr_t> vtable{RE::VTABLE_ArrowProjectile[0]};
+        _originalOnKill = vtable.write_vfunc(0xA8, OnKill);
         log::info("[processEventHook] ...ProcessEvent hook installed");
     }
 
@@ -187,6 +189,7 @@ namespace arrow {
         } else {
             ProcessEventHook::AddPendingArrow(projectile.get(), a_data);
         }
+        ProcessEventHook::appendAR(projectile.get(), a_data.ar_check);
         return true;
     }
 
@@ -221,10 +224,10 @@ namespace arrow {
         //tag is arrow rain
         if (tag == "ArrowRain"sv) {
             // log::info("[arrowInterpreter] Actor {:08X} released arrow rain", actor->GetFormID());
-            ReleaseArrowRain(ammo, bow, actor, {.isArrowRain=true,.radius = 0.0f}, 0.33f);
-            // for (std::uint32_t i = 0; i < 10; ++i) {
-            //     ReleaseArrowRain(ammo, bow, actor, {.isArrowRain=true}, 0.33f);
-            // }
+            ReleaseArrowRain(ammo, bow, actor, {.isArrowRain=true}, 0.33f);
+            for (std::uint32_t i = 0; i < 4; ++i) {
+                ReleaseArrowRain(ammo, bow, actor, {.isArrowRain=true}, 0.33f);
+            }
             return;
         }
         const auto params = process(payload);
@@ -281,6 +284,12 @@ namespace arrow {
     void ProcessEventHook::AddPendingArrow(const RE::Projectile* a_projectile, ArrowData a_data) {
         std::scoped_lock lock(pendingArrowsMutex);
         pendingArrows.emplace(a_projectile, a_data);
+        //log::info("[arrowInterpreter] Stored Arrow");
+    }
+
+    void ProcessEventHook::appendAR(const RE::Projectile* a_projectile, float radius) {
+        std::scoped_lock lock(ARmutex);
+        ARarrows.emplace(a_projectile, radius);
         //log::info("[arrowInterpreter] Stored Arrow");
     }
 
@@ -411,5 +420,17 @@ namespace arrow {
             //    a_this->GetAngle().x, a_this->GetAngle().y,a_this->GetAngle().z);
         }
         
+    }
+    
+    void ProcessEventHook::OnKill(RE::Projectile* a_projectile) {
+        {
+            std::scoped_lock lock(ARmutex);
+            auto it = ARarrows.find(a_projectile);
+            if (it == ARarrows.end()) {
+                return;
+            }
+            ARarrows.erase(it);
+        }
+        _originalOnKill(a_projectile);
     }
 }
