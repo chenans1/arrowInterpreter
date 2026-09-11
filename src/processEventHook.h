@@ -10,7 +10,7 @@ namespace arrow {
             float apex = {512.0f};
             float duration = {1.0f};
 
-            float ar_check = {128.0f};
+            float ar_check = {256.0f};
         };
     class ProcessEventHook {
         public:
@@ -18,8 +18,8 @@ namespace arrow {
             static void InstallProjectileHook();
             static void AddPendingArrow(const RE::Projectile* a_projectile, ArrowData a_data);
             //second param is extra radius that arrow checks, diff from the spread
-            static std::unordered_map<const RE::Projectile*, float> ARarrows;
-            static std::mutex ARmutex;
+            static inline std::unordered_map<const RE::Projectile*, float> ARarrows;
+            static inline std::mutex ARmutex;
             static void appendAR(const RE::Projectile* a_projectile, float radius);
 
         private:

@@ -423,14 +423,12 @@ namespace arrow {
     }
     
     void ProcessEventHook::OnKill(RE::Projectile* a_projectile) {
+        log::info("[ProcessEventHook] OnKill(): projectile={:p}", static_cast<void*>(a_projectile));
         {
             std::scoped_lock lock(ARmutex);
-            auto it = ARarrows.find(a_projectile);
-            if (it == ARarrows.end()) {
-                return;
-            }
-            ARarrows.erase(it);
+            ARarrows.erase(a_projectile);
         }
+
         _originalOnKill(a_projectile);
     }
 }

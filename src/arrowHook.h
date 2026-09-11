@@ -13,22 +13,30 @@ class arrowHook{
         }
 
     private:
-        static void AddImpact(RE::ArrowProjectile* a_projectile, RE::TESObjectREFR* a_ref, const RE::NiPoint3& a_targetLoc, const RE::NiPoint3& a_velocity, RE::hkpCollidable* a_collidable, std::int32_t a_arg6, std::uint32_t a_arg7) {
-            _original(a_projectile, a_ref, a_targetLoc, a_velocity, a_collidable, a_arg6, a_arg7);
+        //apparently clib is capping, on both 1170 and 97 addimpact doesnt actually return void, it returns impact data
+        static RE::Projectile::ImpactData* AddImpact(RE::ArrowProjectile* a_projectile, RE::TESObjectREFR* a_ref, const RE::NiPoint3& a_targetLoc, const RE::NiPoint3& a_velocity, RE::hkpCollidable* a_collidable, std::int32_t a_arg6, std::uint32_t a_arg7) {
+            // _original(a_projectile, a_ref, a_targetLoc, a_velocity, a_collidable, a_arg6, a_arg7);
             
             //check if we are one of the arrows in arrow rain, if not ignore. 
-            float search_radius;
+            float search_radius = 0.0f;
+            bool isArrowRain = false;
             {
                 std::scoped_lock lock(arrow::ProcessEventHook::ARmutex);
 
                 auto it = arrow::ProcessEventHook::ARarrows.find(a_projectile);
-                if (it == arrow::ProcessEventHook::ARarrows.end()) {
-                    return;
+                if (it != arrow::ProcessEventHook::ARarrows.end()) {
+                    search_radius = it->second;
+                    arrow::ProcessEventHook::ARarrows.erase(it);
+                    isArrowRain = true;
                 }
-
-                search_radius = it->second;
-                arrow::ProcessEventHook::ARarrows.erase(it);
             }
+            if (!isArrowRain){ 
+                // _original(a_projectile, a_ref, a_targetLoc, a_velocity, a_collidable, a_arg6, a_arg7); return;
+                return _original(a_projectile, a_ref, a_targetLoc, a_velocity, a_collidable, a_arg6, a_arg7);
+            }
+            //reset the power data for the projectile here, seems to cause issues with damage calc?
+            auto& projectileData = a_projectile->GetProjectileRuntimeData();
+            projectileData.power = 1.0f;
             const RE::NiPoint3 impactPoint = a_targetLoc;
             // SKSE::log::info("[ArrowImpactHook] impact ref={:08X}, position=({}, {}, {})",
             //     a_ref ? a_ref->GetFormID() : 0, impactPoint.x, impactPoint.y, impactPoint.z);
@@ -37,7 +45,9 @@ class arrowHook{
             const auto shooter = a_projectile ->GetProjectileRuntimeData().shooter.get();
             if (!shooter) {
                 SKSE::log::info("[ArrowImpactHook] AddImpact: no shooter");
-                return;
+                // _original(a_projectile, a_ref, a_targetLoc, a_velocity, a_collidable, a_arg6, a_arg7);
+                // return;
+                return _original(a_projectile, a_ref, a_targetLoc, a_velocity, a_collidable, a_arg6, a_arg7);
             }
 
             for (const auto& actorHandle : actorsVec) {
@@ -56,9 +66,12 @@ class arrowHook{
                 }
                 if (!arrow::ApplyArrowHit(a_projectile, actor.get())) {
                     SKSE::log::warn("[ArrowImpactHook] Failed radial hit for {:08X}", actor->GetFormID());
+                } else {
+                    SKSE::log::info("[ArrowImpactHook] AddImpact: projectile={:p} Sucessfully found target", static_cast<void*>(a_projectile));
                 }
             }
-        }
+            return _original(a_projectile, a_ref, a_targetLoc, a_velocity, a_collidable, a_arg6, a_arg7);
+        }   
 
         static inline REL::Relocation<decltype(AddImpact)> _original;
 };
