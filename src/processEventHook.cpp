@@ -186,7 +186,7 @@ namespace arrow {
                 {
                     .isArrowRain = true,
                     .targetForward = a_data.targetForward + forwardOffset,
-                    .targetLateral = lateralOffset,
+                    .targetLateral = a_data.targetLateral + lateralOffset,
                     .apex = a_data.apex,
                     .duration = a_data.duration
                 });
@@ -260,8 +260,9 @@ namespace arrow {
                 // if (const auto crosshairForward = utils::calculateCrosshairForwardOffset(actor, targetingOrigin)) {
                 //     arrowRainData.targetForward = *crosshairForward;
                 // }
-                if (const auto crosshairForward = utils::calculateCrosshairRaycastForwardOffset(actor, targetingOrigin)) {
-                    arrowRainData.targetForward = *crosshairForward;
+                if (const auto target = utils::calculateCrosshairRaycastForwardOffset(actor, targetingOrigin)) {
+                    arrowRainData.targetForward = target->forward;
+                    arrowRainData.targetLateral = target->lateral;
                 }
             } else {
                 if (const auto targetForward = utils::calculateCombatTargetForwardOffset(actor, targetingOrigin)) {
@@ -337,10 +338,15 @@ namespace arrow {
         //log::info("[arrowInterpreter] Stored Arrow");
     }
 
-    static bool calculateNewVelocity(RE::Projectile* projectile,float targetForward,float targetLateral,float apexHeight,float flightTime) {
+    static bool calculateNewVelocity(RE::Projectile* projectile, float targetForward, float targetLateral, float apexHeight, float flightTime) {
         if (!projectile || targetForward <= 0.0f || apexHeight <= 0.0f || flightTime <= 0.0f) {
             return false;
         }
+        //adjusting the flight duration and arc a little based on forward duration for more natural movement
+        const auto newValues = utils::scaleArc(targetForward, flightTime, apexHeight);
+        flightTime = newValues.duration;
+        apexHeight = newValues.apex;
+
         //matching the values reverse engineered by smoothcam
         constexpr float havokToGameUnits = 59.0f;
         float worldGravityZ = -9.8f;

@@ -82,8 +82,13 @@ namespace utils {
         return forwardOffset;
     }
 
+    struct TargetOffsets {
+        float forward;
+        float lateral;
+    };
+
     //Converts the centre of the rendered view into a world ray and asks the current Havok world for its first hit.
-    static inline std::optional<float> calculateCrosshairRaycastForwardOffset(const RE::Actor* actor, const RE::NiPoint3& targetingOrigin, float maximumRayLength = 10000.0f) {
+    static inline std::optional<TargetOffsets> calculateCrosshairRaycastForwardOffset(const RE::Actor* actor, const RE::NiPoint3& targetingOrigin, float maximumRayLength = 10000.0f) {
         if (!actor || actor != RE::PlayerCharacter::GetSingleton() || maximumRayLength <= 0.0f) {
             return std::nullopt;
         }
@@ -202,10 +207,14 @@ namespace utils {
         //     "[arrowInterpreter] Crosshair raycast target: point=({}, {}, {}), forwardOffset={}, lateralError={}, hitFraction={}",
         //     target.x, target.y, target.z, forwardOffset, lateralOffset, hitFraction);
 
-        if (!std::isfinite(forwardOffset) || forwardOffset < 32.0f) {
+        if (!std::isfinite(forwardOffset) || forwardOffset < 128.0f) {
             return std::nullopt;
         }
-        return std::min(forwardOffset, maximumRayLength);
+        // return std::min(forwardOffset, maximumRayLength);
+        return TargetOffsets{
+            .forward = std::min(forwardOffset, maximumRayLength),
+            .lateral = std::min(lateralOffset, 256.0f)
+        };
     }
 
     // NPC prototype: assume the actor is aiming at its current combat target, making horizontal actor-to-target distance the desired forward offset.
@@ -245,6 +254,36 @@ namespace utils {
         return horizontalDistance;
     }
     
-    
+    struct ScaledArc {
+        float duration;
+        float apex;
+    };
+
+    static inline ScaledArc scaleArc(float horizontalDistance, float baseDuration, float baseApex) {
+        constexpr float minimumDistance = 128.0f;
+        constexpr float referenceDistance = 768.0f;
+        horizontalDistance = std::max(horizontalDistance, minimumDistance);
+
+        if (horizontalDistance <= referenceDistance) {
+            const float normalized = (horizontalDistance - minimumDistance) / (referenceDistance - minimumDistance);
+            const float smooth = normalized * normalized* (3.0f - 2.0f * normalized);
+            constexpr float minimumDurationScale = 0.70f;
+            constexpr float minimumApexScale = 0.95f;
+            return {
+                .duration = std::lerp(baseDuration * minimumDurationScale, baseDuration, smooth),
+                .apex = std::lerp(baseApex * minimumApexScale, baseApex, smooth)
+            };
+        }
+
+        //slight adjust of apex. more pronounced scaling of flight duration
+        const float distanceDoublings = std::log2(horizontalDistance / referenceDistance);
+        constexpr float durationGrowthPerDoubling = 0.25f; //+25% increase in base flight duration per doubling of forward dist
+        constexpr float apexGrowthPerDoubling = 0.15f; //15% increase of base apex height per doubling of forward dist
+
+        return {
+            .duration = std::min(baseDuration * (1.0f+durationGrowthPerDoubling * distanceDoublings), baseDuration * 2.0f),
+            .apex = std::min(baseApex * (1.0f + apexGrowthPerDoubling * distanceDoublings), baseApex * 1.5f)
+        };
+    }
 
 }
