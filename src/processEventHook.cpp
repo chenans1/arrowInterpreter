@@ -340,7 +340,7 @@ namespace arrow {
         float horVelocityScale  = 0.0f;
         if (std::abs(kT) < 1.0e-5) {
             requiredGravity = 8.0f * apexHeight / (flightTime * flightTime);
-            initVertVelocity = 4.0f * apexHeight/4.0f*apexHeight/flightTime;
+            initVertVelocity = 4.0f * apexHeight/flightTime;
             horVelocityScale  = 1.0f/flightTime;
         } else {
             //1-e^(-kt)
