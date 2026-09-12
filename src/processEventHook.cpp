@@ -239,7 +239,7 @@ namespace arrow {
                     .apex = arrowRainData.apex
                 },
                 .maximumSpread = 1024.0f,
-                .maximumCount = 18,
+                .maximumCount = 20,
                 .consumeDefaultsToCount = false
             });
             if (params.consume > 0) {
@@ -249,7 +249,7 @@ namespace arrow {
                     return;
                 }
             }
-
+            //min spread radius just gonna roughly set it to 96 units for now
             arrowRainData.radius = std::max(96.0f, params.spread);
             arrowRainData.apex = params.apex;
             arrowRainData.duration = params.flightDuration;
