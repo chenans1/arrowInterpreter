@@ -49,7 +49,7 @@ namespace arrow {
 
                 const auto [ptr, error] = std::from_chars(begin, end, value);
 
-                if (error == std::errc{} && ptr == end && value >= 0.0f && value <= 360.0f) {
+                if (error == std::errc{} && ptr == end && value >= 0.0f && value <= 1024.0f) {
                     result.spread = value;
                 }
             } else if (key == "count") {

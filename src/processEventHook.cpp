@@ -233,9 +233,15 @@ namespace arrow {
             if (actor->IsPlayerRef()) {
                 auto targetingOrigin = actor->GetPosition();
                 targetingOrigin.z += 96.0f;
-                if (const auto crosshairForward = utils::calculateCrosshairForwardOffset(actor, targetingOrigin)) {
+                // if (const auto crosshairForward = utils::calculateCrosshairForwardOffset(actor, targetingOrigin)) {
+                //     arrowRainData.targetForward = *crosshairForward;
+                // }
+                if (const auto crosshairForward = utils::calculateCrosshairRaycastForwardOffset(actor, targetingOrigin)) {
                     arrowRainData.targetForward = *crosshairForward;
                 }
+            } else {
+                auto target = actor->GetActorRuntimeData().currentCombatTarget;
+                
             }
 
             // log::info("[arrowInterpreter] Actor {:08X} released arrow rain", actor->GetFormID());
@@ -250,9 +256,9 @@ namespace arrow {
         //          params.consume);
         if (params.consume > 0) {
             const std::int32_t ammoCount = actor->GetInventoryItemCount(ammo);
-
+            float horSpread = std::min(360.0f, params.spread);
             if (ammoCount < static_cast<std::int32_t>(params.consume)) {
-                log::info("[releaseArrow] Actor {:08X}: insufficient ammo ({}/{})", actor->GetFormID(), ammoCount, params.consume);
+                log::info("[releaseArrow] Actor {:08X}: insufficient ammo ({}/{})", actor->GetFormID(), ammoCount, horSpread);
                 return;
             }
         }
@@ -381,7 +387,7 @@ namespace arrow {
         // ArrowProjectile::GetGravity(): weakGravity - ((weakGravity - recordGravity) * power) from ghidra, so use neg values to tune grav
         projectileData.power = (weakGravity - requiredGravityMultiplier) / gravityRange;
 
-        const float actualGravity = std::abs(worldGravityZ) * projectile->GetGravity() * havokToGameUnits;
+        // const float actualGravity = std::abs(worldGravityZ) * projectile->GetGravity() * havokToGameUnits;
         // log::info("[arrowInterpreter] arrowRain gravity requested={}, actual={}, multiplier={}, power={}",
         //     requiredGravity,actualGravity,requiredGravityMultiplier,projectileData.power);
         
