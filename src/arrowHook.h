@@ -55,22 +55,24 @@ class arrowHook{
             for (const auto& actorHandle : actorsVec) {
                 auto actor = actorHandle.get();
                 if (!actor) {
-                    SKSE::log::warn("[ArrowImpactHook] AddImpact: invalid actor");
+                    // SKSE::log::warn("[ArrowImpactHook] AddImpact: invalid actor");
                     continue;
                 }
                 if (actor.get() == directlyHitActor) {
-                    SKSE::log::info("[ArrowImpactHook] AddImpact: Skip direct target {:08X}", actor->GetFormID());
+                    // SKSE::log::info("[ArrowImpactHook] AddImpact: Skip direct target {:08X}", actor->GetFormID());
                     continue;
                 }
                 if (shooter && actor.get() == shooter.get()) {
-                    SKSE::log::info("[ArrowImpactHook] AddImpact: Skipping shooter {:08X}", actor->GetFormID());
+                    // SKSE::log::info("[ArrowImpactHook] AddImpact: Skipping shooter {:08X}", actor->GetFormID());
                     continue;
                 }
                 if (!arrow::ApplyArrowHit(a_projectile, actor.get())) {
-                    SKSE::log::warn("[ArrowImpactHook] Failed radial hit for {:08X}", actor->GetFormID());
-                } else {
-                    SKSE::log::info("[ArrowImpactHook] AddImpact: projectile={:p} Sucessfully found target", static_cast<void*>(a_projectile));
-                }
+                    // SKSE::log::warn("[ArrowImpactHook] Failed radial hit for {:08X}", actor->GetFormID());
+                    continue;
+                } 
+                // else {
+                //     SKSE::log::info("[ArrowImpactHook] AddImpact: projectile={:p} Sucessfully found target", static_cast<void*>(a_projectile));
+                // }
             }
             a_projectile->GetMissileRuntimeData().impactResult = RE::ImpactResult::kDestroy;
             // return _original(a_projectile, a_ref, a_targetLoc, a_velocity, a_collidable, a_arg6, a_arg7);

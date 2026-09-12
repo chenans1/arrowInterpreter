@@ -3,7 +3,9 @@
 #include "payload.h"
 #include <cmath>
 #include <numbers>
+#include <optional>
 #include <random>
+#include "utils.h"
 
 using namespace SKSE;
 using namespace SKSE::log;
@@ -225,10 +227,21 @@ namespace arrow {
         }
         //tag is arrow rain
         if (tag == "ArrowRain"sv) {
+            ArrowData arrowRainData{ .isArrowRain = true };
+
+            // Keep the prototype independent of third-person camera offsets by measuring from an assumed player firing height.
+            if (actor->IsPlayerRef()) {
+                auto targetingOrigin = actor->GetPosition();
+                targetingOrigin.z += 96.0f;
+                if (const auto crosshairForward = utils::calculateCrosshairForwardOffset(actor, targetingOrigin)) {
+                    arrowRainData.targetForward = *crosshairForward;
+                }
+            }
+
             // log::info("[arrowInterpreter] Actor {:08X} released arrow rain", actor->GetFormID());
-            ReleaseArrowRain(ammo, bow, actor, {.isArrowRain=true}, 0.33f);
-            for (std::uint32_t i = 0; i < 4; ++i) {
-                ReleaseArrowRain(ammo, bow, actor, {.isArrowRain=true}, 0.33f);
+            ReleaseArrowRain(ammo, bow, actor, arrowRainData, 0.20f);
+            for (std::uint32_t i = 0; i < 7; ++i) {
+                ReleaseArrowRain(ammo, bow, actor, arrowRainData, 0.20f);
             }
             return;
         }
@@ -369,12 +382,8 @@ namespace arrow {
         projectileData.power = (weakGravity - requiredGravityMultiplier) / gravityRange;
 
         const float actualGravity = std::abs(worldGravityZ) * projectile->GetGravity() * havokToGameUnits;
-        log::info(
-            "[arrowInterpreter] arrowRain gravity requested={}, actual={}, multiplier={}, power={}",
-            requiredGravity,
-            actualGravity,
-            requiredGravityMultiplier,
-            projectileData.power);
+        // log::info("[arrowInterpreter] arrowRain gravity requested={}, actual={}, multiplier={}, power={}",
+        //     requiredGravity,actualGravity,requiredGravityMultiplier,projectileData.power);
         
         auto& velocity = projectileData.linearVelocity;
         const float oldHorizontalSpeed = std::hypot(velocity.x, velocity.y);
@@ -396,7 +405,7 @@ namespace arrow {
         velocity.x = displacementX * horVelocityScale;
         velocity.y = displacementY * horVelocityScale;
         velocity.z = initVertVelocity;
-        log::info("[arrowInterpreter] Arrow rain velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
+        // log::info("[arrowInterpreter] Arrow rain velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
         return true;
     }
 
@@ -422,7 +431,7 @@ namespace arrow {
         const float x = velocity.x;
         const float y = velocity.y;
         if (pending.isArrowRain) {
-            log::info("[arrowInterpreter] arrowRain Before velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
+            // log::info("[arrowInterpreter] arrowRain Before velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
             calculateNewVelocity(
                 a_this,
                 pending.targetForward,
