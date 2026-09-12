@@ -225,9 +225,19 @@ namespace arrow {
             log::info("[arrowInterpreter] Actor {:08X} has no ammunition equipped", actor->GetFormID());
             return;
         }
+        const auto params = process(payload);
+
         //tag is arrow rain
         if (tag == "ArrowRain"sv) {
             ArrowData arrowRainData{ .isArrowRain = true };
+            float spread_radius = std::max(128.0f, params.spread);
+            if (params.consume > 0) {
+                const std::int32_t ammoCount = actor->GetInventoryItemCount(ammo);
+                if (ammoCount < static_cast<std::int32_t>(params.consume)) {
+                    log::info("[releaseArrow] Actor {:08X}: insufficient ammo ({})", actor->GetFormID(), ammoCount);
+                    return;
+                }
+            }
             if (actor->IsPlayerRef()) {
                 auto targetingOrigin = actor->GetPosition();
                 targetingOrigin.z += 96.0f;
@@ -246,24 +256,28 @@ namespace arrow {
             }
 
             // log::info("[arrowInterpreter] Actor {:08X} released arrow rain", actor->GetFormID());
-            ReleaseArrowRain(ammo, bow, actor, arrowRainData, 0.20f);
-            for (std::uint32_t i = 0; i < 7; ++i) {
-                ReleaseArrowRain(ammo, bow, actor, arrowRainData, 0.20f);
+            // ReleaseArrowRain(ammo, bow, actor, arrowRainData, 0.20f);
+            for (std::uint32_t i = 0; i < params.count; ++i) {
+                ReleaseArrowRain(ammo, bow, actor, arrowRainData, params.damageMult);
+            }
+
+            if (params.consume > 0) {
+                actor->UseAmmo(params.consume);
             }
             return;
         }
-        const auto params = process(payload);
+        // const auto params = process(payload);
         //log::info("[releaseArrow] dmg={} count={} spread={} consume={}", params.damageMult, params.count, params.spread,
         //          params.consume);
         if (params.consume > 0) {
             const std::int32_t ammoCount = actor->GetInventoryItemCount(ammo);
-            float horSpread = std::min(360.0f, params.spread);
+            // float horSpread = std::min(360.0f, params.spread);
             if (ammoCount < static_cast<std::int32_t>(params.consume)) {
-                log::info("[releaseArrow] Actor {:08X}: insufficient ammo ({}/{})", actor->GetFormID(), ammoCount, horSpread);
-                return;
+                    log::info("[releaseArrow] Actor {:08X}: insufficient ammo ({})", actor->GetFormID(), ammoCount);
+                    return;
             }
         }
-
+        
         if (params.count == 1) {
             if (!releaseArrowOffset(ammo, bow, actor, params.damageMult, 0.0f)) {
                 return;
