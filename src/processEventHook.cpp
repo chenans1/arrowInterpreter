@@ -253,10 +253,10 @@ namespace arrow {
             arrowRainData.radius = std::max(128.0f, params.spread);
             arrowRainData.apex = params.apex;
             arrowRainData.duration = params.flightDuration;
-            log::info("[releaseArrowRain] count={}, radius={}, consume={}", params.count, arrowRainData.radius, params.consume);
+            // log::info("[releaseArrowRain] count={}, radius={}, consume={}", params.count, arrowRainData.radius, params.consume);
+            auto targetingOrigin = actor->GetPosition();
+            targetingOrigin.z += 96.0f;
             if (actor->IsPlayerRef()) {
-                auto targetingOrigin = actor->GetPosition();
-                targetingOrigin.z += 96.0f;
                 // if (const auto crosshairForward = utils::calculateCrosshairForwardOffset(actor, targetingOrigin)) {
                 //     arrowRainData.targetForward = *crosshairForward;
                 // }
@@ -264,13 +264,11 @@ namespace arrow {
                     arrowRainData.targetForward = *crosshairForward;
                 }
             } else {
-                auto targetingOrigin = actor->GetPosition();
-                targetingOrigin.z += 96.0f;
                 if (const auto targetForward = utils::calculateCombatTargetForwardOffset(actor, targetingOrigin)) {
                     arrowRainData.targetForward = *targetForward;
                 }
             }
-
+            arrowRainData.targetForward = std::max(128.0f, arrowRainData.targetForward);
             // log::info("[arrowInterpreter] Actor {:08X} released arrow rain", actor->GetFormID());
             // ReleaseArrowRain(ammo, bow, actor, arrowRainData, 0.20f);
             for (std::uint32_t i = 0; i < params.count; ++i) {
@@ -315,19 +313,13 @@ namespace arrow {
         }
     }
 
-    RE::BSEventNotifyControl ProcessEventHook::ProcessEvent_NPC(
-        RE::BSTEventSink<RE::BSAnimationGraphEvent>* a_sink, 
-        RE::BSAnimationGraphEvent* a_event,
-        RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_eventSource) 
+    RE::BSEventNotifyControl ProcessEventHook::ProcessEvent_NPC(RE::BSTEventSink<RE::BSAnimationGraphEvent>* a_sink,  RE::BSAnimationGraphEvent* a_event, RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_eventSource) 
     {
         HandleEvent(a_event);
         return _originalNPC(a_sink, a_event, a_eventSource);
     }
 
-    RE::BSEventNotifyControl ProcessEventHook::ProcessEvent_PC(
-        RE::BSTEventSink<RE::BSAnimationGraphEvent>* a_sink,
-        RE::BSAnimationGraphEvent* a_event,
-        RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_eventSource) 
+    RE::BSEventNotifyControl ProcessEventHook::ProcessEvent_PC(RE::BSTEventSink<RE::BSAnimationGraphEvent>* a_sink, RE::BSAnimationGraphEvent* a_event, RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_eventSource) 
     {
         HandleEvent(a_event);
         return _originalPC(a_sink, a_event, a_eventSource);

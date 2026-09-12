@@ -83,8 +83,7 @@ namespace utils {
     }
 
     //Converts the centre of the rendered view into a world ray and asks the current Havok world for its first hit.
-    static inline std::optional<float> calculateCrosshairRaycastForwardOffset(
-        const RE::Actor* actor, const RE::NiPoint3& targetingOrigin, float maximumRayLength = 10000.0f) {
+    static inline std::optional<float> calculateCrosshairRaycastForwardOffset(const RE::Actor* actor, const RE::NiPoint3& targetingOrigin, float maximumRayLength = 10000.0f) {
         if (!actor || actor != RE::PlayerCharacter::GetSingleton() || maximumRayLength <= 0.0f) {
             return std::nullopt;
         }
@@ -246,4 +245,6 @@ namespace utils {
         return horizontalDistance;
     }
     
+    
+
 }
