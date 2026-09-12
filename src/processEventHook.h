@@ -4,9 +4,9 @@ namespace arrow {
     struct ArrowData {
             bool isArrowRain = false;
             float offset = {0.0f};
-            float targetForward = {760.0f};
+            float targetForward = {768.0f};
             float targetLateral = {0.0f};
-            float radius = {324.0f};
+            float radius = {196.0f};
             float apex = {512.0f};
             float duration = {1.0f};
 

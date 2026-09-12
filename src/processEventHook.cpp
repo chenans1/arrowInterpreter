@@ -175,8 +175,10 @@ namespace arrow {
             const float angle = randomFloat(0.0f, 2.0f * 3.1415926f);
             const float offset_radius = a_data.radius * std::sqrt(randomFloat(0.0f, 1.0f));
 
-            const float forwardOffset = offset_radius * std::cosf(angle) * 1.2f;
-            const float lateralOffset = offset_radius * std::sinf(angle) * 0.42f;
+            // const float forwardOffset = offset_radius * std::cosf(angle) * 1.2f;
+            // const float lateralOffset = offset_radius * std::sinf(angle) * 0.42f;
+            const float forwardOffset = offset_radius * std::cosf(angle);
+            const float lateralOffset = offset_radius * std::sinf(angle);
             ProcessEventHook::AddPendingArrow(
                 projectile.get(),
                 {
@@ -293,12 +295,7 @@ namespace arrow {
         //log::info("[arrowInterpreter] Stored Arrow");
     }
 
-    static bool calculateNewVelocity(
-        RE::Projectile* projectile,
-        float targetForward,
-        float targetLateral,
-        float apexHeight,
-        float flightTime) {
+    static bool calculateNewVelocity(RE::Projectile* projectile,float targetForward,float targetLateral,float apexHeight,float flightTime) {
         if (!projectile || targetForward <= 0.0f || apexHeight <= 0.0f || flightTime <= 0.0f) {
             return false;
         }
@@ -328,13 +325,39 @@ namespace arrow {
 
         // For a same-height parabola with a requested apex and duration: apexHeight = gravity * flightTime^2 / 8
         // GetGravity() returns a multiplier applied to Havok gravity and the 59 game-unit conversion, so solve for that multiplier first.
-        const float requiredGravity = 8.0f * apexHeight / (flightTime * flightTime);
+        // const float requiredGravity = 8.0f * apexHeight / (flightTime * flightTime);
         const float gravityUnit = std::abs(worldGravityZ) * havokToGameUnits;
         if (gravityUnit <= 0.0f) {
             return false;
         }
 
+        //need to account for linear dampening (0.099609)
+        //dv/dt = g-lineardampening*v
+        constexpr float linearDampening = 0.099609f;
+        const float kT = linearDampening * flightTime;
+        float requiredGravity = 0.0f;
+        float initVertVelocity = 0.0f;
+        float horVelocityScale  = 0.0f;
+        if (std::abs(kT) < 1.0e-5) {
+            requiredGravity = 8.0f * apexHeight / (flightTime * flightTime);
+            initVertVelocity = 4.0f * apexHeight/4.0f*apexHeight/flightTime;
+            horVelocityScale  = 1.0f/flightTime;
+        } else {
+            //1-e^(-kt)
+            const float decay = -std::expm1(-kT);
+            const float apexTime = std::log(kT/decay) / linearDampening;
+            const float apexDenom = flightTime/decay - 1.0f/linearDampening - apexTime;
+            if (apexDenom <= 0.0f){
+                return false;
+            }
+            requiredGravity = apexHeight*linearDampening/apexDenom;
+            initVertVelocity = requiredGravity * (flightTime / decay - 1.0f/ linearDampening);
+            horVelocityScale=linearDampening/decay;
+        }
         const float requiredGravityMultiplier = requiredGravity / gravityUnit;
+        if (!std::isfinite(requiredGravity) || !std::isfinite(initVertVelocity) || !std::isfinite(horVelocityScale)) {
+                return false;
+        }
         const float weakGravity = weakGravitySetting->GetFloat();
         const float recordGravity = projectileBase->data.gravity;
         const float gravityRange = weakGravity - recordGravity;
@@ -345,8 +368,7 @@ namespace arrow {
         // ArrowProjectile::GetGravity(): weakGravity - ((weakGravity - recordGravity) * power) from ghidra, so use neg values to tune grav
         projectileData.power = (weakGravity - requiredGravityMultiplier) / gravityRange;
 
-        const float actualGravity =
-            std::abs(worldGravityZ) * projectile->GetGravity() * havokToGameUnits;
+        const float actualGravity = std::abs(worldGravityZ) * projectile->GetGravity() * havokToGameUnits;
         log::info(
             "[arrowInterpreter] arrowRain gravity requested={}, actual={}, multiplier={}, power={}",
             requiredGravity,
@@ -367,9 +389,13 @@ namespace arrow {
         const float displacementX = forwardX * targetForward + rightX * targetLateral;
         const float displacementY = forwardY * targetForward + rightY * targetLateral;
 
-        velocity.x = displacementX / flightTime;
-        velocity.y = displacementY / flightTime;
-        velocity.z = 4.0f * apexHeight / flightTime;
+        // velocity.x = displacementX / flightTime;
+        // velocity.y = displacementY / flightTime;
+        // velocity.z = 4.0f * apexHeight / flightTime;
+
+        velocity.x = displacementX * horVelocityScale;
+        velocity.y = displacementY * horVelocityScale;
+        velocity.z = initVertVelocity;
         log::info("[arrowInterpreter] Arrow rain velocity=({}, {}, {})", velocity.x, velocity.y, velocity.z);
         return true;
     }
@@ -416,14 +442,13 @@ namespace arrow {
             //log::info("[arrowInterpreter] Original Angle=({}, {}, {})", point.x, point.y, point.z);
             point.z -= offset;
             a_this->SetAngle(point);
-            //log::info("[arrowInterpreter] Original Angle=({}, {}, {})", 
-            //    a_this->GetAngle().x, a_this->GetAngle().y,a_this->GetAngle().z);
+            //log::info("[arrowInterpreter] Original Angle=({}, {}, {})", a_this->GetAngle().x, a_this->GetAngle().y,a_this->GetAngle().z);
         }
         
     }
     
     void ProcessEventHook::OnKill(RE::Projectile* a_projectile) {
-        log::info("[ProcessEventHook] OnKill(): projectile={:p}", static_cast<void*>(a_projectile));
+        // log::info("[ProcessEventHook] OnKill(): projectile={:p}", static_cast<void*>(a_projectile));
         {
             std::scoped_lock lock(ARmutex);
             ARarrows.erase(a_projectile);
