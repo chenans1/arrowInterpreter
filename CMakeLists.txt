@@ -19,10 +19,14 @@ include(extern/CommonLibVR-ng/cmake/CommonLibSSE.cmake)
 
 set(SOURCES
     src/plugin.cpp
+    src/hitDataAPI.h
+    src/hitDataAPI.cpp
     src/processEventHook.h
     src/processEventHook.cpp
     src/payload.h
     src/payload.cpp
+    src/utils.h
+    src/arrowHook.h
 )
 
 add_commonlibsse_plugin(${PROJECT_NAME} SOURCES ${SOURCES}) # <--- specifies plugin.cpp

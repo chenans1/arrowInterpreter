@@ -1,22 +1,49 @@
 #pragma once
 
 namespace arrow {
+    struct ArrowData {
+            bool isArrowRain = false;
+            float offset = {0.0f};
+            float targetForward = {768.0f};
+            float targetLateral = {0.0f};
+            float radius = {196.0f};
+            float apex = {512.0f};
+            float duration = {1.2f};
+
+            float ar_check = {128.0f};
+        };
     class ProcessEventHook {
-    public:
-        static void Install();
+        public:
+            static void Install();
+            static void InstallProjectileHook();
+            static void AddPendingArrow(const RE::Projectile* a_projectile, ArrowData a_data);
+            //second param is extra radius that arrow checks, diff from the spread
+            static inline std::unordered_map<const RE::Projectile*, float> ARarrows;
+            static inline std::mutex ARmutex;
+            static void appendAR(const RE::Projectile* a_projectile, float radius);
 
-    private:
-        static RE::BSEventNotifyControl ProcessEvent_NPC(
-            RE::BSTEventSink<RE::BSAnimationGraphEvent>* a_sink,
-            RE::BSAnimationGraphEvent* a_event,
-            RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_eventSource);
+        private:
+            static RE::BSEventNotifyControl ProcessEvent_NPC(
+                RE::BSTEventSink<RE::BSAnimationGraphEvent>* a_sink,
+                RE::BSAnimationGraphEvent* a_event,
+                RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_eventSource);
 
-        static RE::BSEventNotifyControl ProcessEvent_PC(
-            RE::BSTEventSink<RE::BSAnimationGraphEvent>* a_sink,
-            RE::BSAnimationGraphEvent* a_event,
-            RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_eventSource);
+            static RE::BSEventNotifyControl ProcessEvent_PC(
+                RE::BSTEventSink<RE::BSAnimationGraphEvent>* a_sink,
+                RE::BSAnimationGraphEvent* a_event,
+                RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_eventSource);
 
-        static inline REL::Relocation<decltype(ProcessEvent_NPC)> _originalNPC;
-        static inline REL::Relocation<decltype(ProcessEvent_PC)> _originalPC;
+            static inline REL::Relocation<decltype(ProcessEvent_NPC)> _originalNPC;
+            static inline REL::Relocation<decltype(ProcessEvent_PC)> _originalPC;
+            
+            //used to detect the arrows that are fired. 
+            static inline std::unordered_map<const RE::Projectile*, ArrowData> pendingArrows;
+            static inline std::mutex pendingArrowsMutex;
+            
+            static void InitProjectile(RE::Projectile* a_this);
+            static inline REL::Relocation<decltype(InitProjectile)> _InitProjectile;
+
+            static void OnKill(RE::Projectile* a_projectile);
+            static inline REL::Relocation<decltype(OnKill)> _originalOnKill;
     };
 }
