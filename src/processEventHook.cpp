@@ -228,8 +228,6 @@ namespace arrow {
         //tag is arrow rain
         if (tag == "ArrowRain"sv) {
             ArrowData arrowRainData{ .isArrowRain = true };
-
-            // Keep the prototype independent of third-person camera offsets by measuring from an assumed player firing height.
             if (actor->IsPlayerRef()) {
                 auto targetingOrigin = actor->GetPosition();
                 targetingOrigin.z += 96.0f;
@@ -240,8 +238,11 @@ namespace arrow {
                     arrowRainData.targetForward = *crosshairForward;
                 }
             } else {
-                auto target = actor->GetActorRuntimeData().currentCombatTarget;
-                
+                auto targetingOrigin = actor->GetPosition();
+                targetingOrigin.z += 96.0f;
+                if (const auto targetForward = utils::calculateCombatTargetForwardOffset(actor, targetingOrigin)) {
+                    arrowRainData.targetForward = *targetForward;
+                }
             }
 
             // log::info("[arrowInterpreter] Actor {:08X} released arrow rain", actor->GetFormID());

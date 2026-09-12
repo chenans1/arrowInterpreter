@@ -210,6 +210,41 @@ namespace utils {
         return std::min(forwardOffset, maximumRayLength);
     }
 
-    //compute forward offset npc gonan just be checking combat target and calc distance
+    // NPC prototype: assume the actor is aiming at its current combat target, making horizontal actor-to-target distance the desired forward offset.
+    static inline std::optional<float> calculateCombatTargetForwardOffset(const RE::Actor* actor, const RE::NiPoint3& targetingOrigin, float maximumDistance = 10000.0f) {
+        if (!actor || actor->IsPlayerRef() || maximumDistance <= 0.0f) {
+            return std::nullopt;
+        }
+
+        const auto targetPtr = actor->GetActorRuntimeData().currentCombatTarget.get();
+        if (!targetPtr || targetPtr.get() == actor || targetPtr->IsDisabled()) {
+            SKSE::log::info("[arrowInterpreter] NPC {:08X} has no usable combat target", actor->GetFormID());
+            return std::nullopt;
+        }
+
+        const auto targetPosition = targetPtr->GetPosition();
+        const float deltaX = targetPosition.x - targetingOrigin.x;
+        const float deltaY = targetPosition.y - targetingOrigin.y;
+        const float horizontalDistance = std::hypot(deltaX, deltaY);
+
+        constexpr float minimumDistance = 32.0f;
+        if (!std::isfinite(horizontalDistance) ||
+            horizontalDistance < minimumDistance ||
+            horizontalDistance > maximumDistance) {
+            // SKSE::log::info(
+            //     "[arrowInterpreter] NPC combat target rejected: shooter={:08X}, target={:08X}, horizontalDistance={}",
+            //     actor->GetFormID(), targetPtr->GetFormID(), horizontalDistance);
+            return std::nullopt;
+        }
+
+        // SKSE::log::info(
+        //     "[arrowInterpreter] NPC combat target: shooter={:08X}, target={:08X}, origin=({}, {}, {}), point=({}, {}, {}), forwardOffset={}",
+        //     actor->GetFormID(), targetPtr->GetFormID(),
+        //     targetingOrigin.x, targetingOrigin.y, targetingOrigin.z,
+        //     targetPosition.x, targetPosition.y, targetPosition.z,
+        //     horizontalDistance);
+
+        return horizontalDistance;
+    }
     
 }
