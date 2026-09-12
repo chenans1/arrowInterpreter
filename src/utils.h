@@ -23,9 +23,12 @@ namespace utils {
         });
         return actors;
     }
-
+    struct TargetOffsets {
+        float forward;
+        float lateral;
+    };
     // Uses the collision point maintained by Skyrim's normal crosshair picker.
-    static inline std::optional<float> calculateCrosshairForwardOffset(const RE::Actor* actor, const RE::NiPoint3& launchOrigin) {
+    static inline std::optional<TargetOffsets> calculateCrosshairForwardOffset(const RE::Actor* actor, const RE::NiPoint3& launchOrigin) {
         if (!actor || actor != RE::PlayerCharacter::GetSingleton()) {
             return std::nullopt;
         }
@@ -48,16 +51,16 @@ namespace utils {
 
         const float deltaX = target.x - launchOrigin.x;
         const float deltaY = target.y - launchOrigin.y;
-        const float horizontalDistance = std::hypot(deltaX, deltaY);
+        // const float horizontalDistance = std::hypot(deltaX, deltaY);
 
-        constexpr float minimumDistance = 32.0f;
+        constexpr float minimumDistance = 128.0f;
         constexpr float maximumDistance = 10000.0f;
-        if (horizontalDistance < minimumDistance || horizontalDistance > maximumDistance) {
-            SKSE::log::info(
-                "[arrowInterpreter] Native crosshair target rejected: point=({}, {}, {}), horizontalDistance={}"
-                ,target.x,target.y,target.z,horizontalDistance);
-            return std::nullopt;
-        }
+        // if (horizontalDistance < minimumDistance || horizontalDistance > maximumDistance) {
+        //     SKSE::log::info(
+        //         "[arrowInterpreter] Native crosshair target rejected: point=({}, {}, {}), horizontalDistance={}"
+        //         ,target.x,target.y,target.z,horizontalDistance);
+        //     return std::nullopt;
+        // }
 
         const float heading = actor->GetAimHeading();
         const float forwardX = std::sin(heading);
@@ -67,7 +70,7 @@ namespace utils {
         const float forwardOffset = deltaX * forwardX + deltaY * forwardY;
         const float lateralOffset = deltaX * rightX + deltaY * rightY;
 
-        if (!std::isfinite(forwardOffset) || forwardOffset < minimumDistance) {
+        if (!std::isfinite(forwardOffset)) {
             // SKSE::log::info("[arrowInterpreter] Native crosshair target rejected: forwardOffset={}, horizontalDistance={}",
             //     forwardOffset,horizontalDistance);
             return std::nullopt;
@@ -79,13 +82,12 @@ namespace utils {
         //     forwardOffset, lateralOffset);
         
         // return sqrt(forwardOffset*forwardOffset + lateralOffset*lateralOffset);
-        return forwardOffset;
+        // return forwardOffset;
+        return TargetOffsets{
+            .forward = std::clamp(forwardOffset, minimumDistance, maximumDistance),
+            .lateral = std::clamp(lateralOffset, -256.0f, 256.0f)
+        };
     }
-
-    struct TargetOffsets {
-        float forward;
-        float lateral;
-    };
 
     //Converts the centre of the rendered view into a world ray and asks the current Havok world for its first hit.
     static inline std::optional<TargetOffsets> calculateCrosshairRaycastForwardOffset(const RE::Actor* actor, const RE::NiPoint3& targetingOrigin, float maximumRayLength = 10000.0f) {
@@ -207,13 +209,14 @@ namespace utils {
         //     "[arrowInterpreter] Crosshair raycast target: point=({}, {}, {}), forwardOffset={}, lateralError={}, hitFraction={}",
         //     target.x, target.y, target.z, forwardOffset, lateralOffset, hitFraction);
 
-        if (!std::isfinite(forwardOffset) || forwardOffset < 128.0f) {
+        if (!std::isfinite(forwardOffset) || !std::isfinite(lateralOffset) || forwardOffset <= 0.0f) {
             return std::nullopt;
         }
+
         // return std::min(forwardOffset, maximumRayLength);
         return TargetOffsets{
-            .forward = std::min(forwardOffset, maximumRayLength),
-            .lateral = std::min(lateralOffset, 256.0f)
+            .forward = std::clamp(forwardOffset, 128.0f, maximumRayLength),
+            .lateral = std::clamp(lateralOffset, -256.0f, 256.0f)
         };
     }
 
@@ -234,10 +237,9 @@ namespace utils {
         const float deltaY = targetPosition.y - targetingOrigin.y;
         const float horizontalDistance = std::hypot(deltaX, deltaY);
 
-        constexpr float minimumDistance = 32.0f;
-        if (!std::isfinite(horizontalDistance) ||
-            horizontalDistance < minimumDistance ||
-            horizontalDistance > maximumDistance) {
+        constexpr float minimumDistance = 128.0f;
+        // if (!std::isfinite(horizontalDistance) || horizontalDistance < minimumDistance || horizontalDistance > maximumDistance) {
+        if (!std::isfinite(horizontalDistance)) {
             // SKSE::log::info(
             //     "[arrowInterpreter] NPC combat target rejected: shooter={:08X}, target={:08X}, horizontalDistance={}",
             //     actor->GetFormID(), targetPtr->GetFormID(), horizontalDistance);
@@ -250,8 +252,10 @@ namespace utils {
         //     targetingOrigin.x, targetingOrigin.y, targetingOrigin.z,
         //     targetPosition.x, targetPosition.y, targetPosition.z,
         //     horizontalDistance);
-
-        return horizontalDistance;
+        // horizontalDistance = std::max(minimumDistance, horizontalDistance);
+        // horizontalDistance = std::min(maximumDistance, std::max(minimumDistance, horizontalDistance));
+        // return std::min(maximumDistance, std::max(minimumDistance, horizontalDistance));
+        return std::clamp(horizontalDistance, minimumDistance, maximumDistance);
     }
     
     struct ScaledArc {

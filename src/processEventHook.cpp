@@ -250,7 +250,7 @@ namespace arrow {
                 }
             }
 
-            arrowRainData.radius = std::max(128.0f, params.spread);
+            arrowRainData.radius = std::max(96.0f, params.spread);
             arrowRainData.apex = params.apex;
             arrowRainData.duration = params.flightDuration;
             // log::info("[releaseArrowRain] count={}, radius={}, consume={}", params.count, arrowRainData.radius, params.consume);
