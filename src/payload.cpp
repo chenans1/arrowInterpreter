@@ -1,13 +1,40 @@
 #include "PCH.h"
 #include "payload.h"
+#include "payloadAlias.h"
+
+using namespace SKSE;
+using namespace SKSE::log;
+using namespace std::literals;
 
 namespace arrow {
     //helpers for trimming strings
 
     arrowPayload process(std::string_view payload, const options& options) { 
         // arrowPayload result{};
+        payloadLimits limits{};
+        limits.maximumSpread = options.maximumSpread;
+        limits.maximumCount = options.maximumCount;
         arrowPayload result = options.defaults;
+
         bool consumeSpecified = false;
+        if (payload.starts_with('$')) {
+            const auto separator = payload.find('|');
+            const auto aliasName = payload.substr(0, separator);
+
+            if (const auto aliasOverride = payloadAlias::find(aliasName)) {
+                result.damageMult = aliasOverride->damageMult.value_or(result.damageMult);
+                result.count = aliasOverride->count.value_or(result.count);
+                result.spread = aliasOverride->spread.value_or(result.spread);
+                result.flightDuration = aliasOverride->duration.value_or(result.flightDuration);
+                result.apex = aliasOverride->apex.value_or(result.apex);
+
+                if (aliasOverride->consume) {
+                    result.consume = *aliasOverride->consume;
+                    consumeSpecified = true;
+                }
+            }
+        }
+
         while (!payload.empty()) {
             const auto separator = payload.find('|');
 
@@ -41,7 +68,7 @@ namespace arrow {
 
                 const auto [ptr, error] = std::from_chars(begin, end, value);
 
-                if (error == std::errc{} && ptr == end) {
+                if (error == std::errc{} && ptr == end && value >= limits.minimumDamage && value <= limits.maximumDamage) {
                     result.damageMult = value;
                 }
             } else if (key == "spread") {
@@ -49,7 +76,7 @@ namespace arrow {
 
                 const auto [ptr, error] = std::from_chars(begin, end, value);
 
-                if (error == std::errc{} && ptr == end && value >= 0.0f && value <= options.maximumSpread) {
+                if (error == std::errc{} && ptr == end && value >= limits.minimumSpread && value <= limits.maximumSpread) {
                     result.spread = value;
                 }
             } else if (key == "count") {
@@ -57,7 +84,7 @@ namespace arrow {
 
                 const auto [ptr, error] = std::from_chars(begin, end, value);
 
-                if (error == std::errc{} && ptr == end && value >= 1 && value <= options.maximumCount) {
+                if (error == std::errc{} && ptr == end && value >= limits.minimumCount && value <= limits.maximumCount) {
                     result.count = value;
                 }
             } else if (key == "consume") {
@@ -65,7 +92,7 @@ namespace arrow {
 
                 const auto [ptr, error] = std::from_chars(begin, end, value);
 
-                if (error == std::errc{} && ptr == end) {
+                if (error == std::errc{} && ptr == end && value >= limits.minimumConsume && value <= limits.maximumConsume) {
                     result.consume = value;
                     consumeSpecified = true;
                 }
@@ -74,7 +101,7 @@ namespace arrow {
 
                 const auto [ptr, error] = std::from_chars(begin, end, value);
 
-                if (error == std::errc{} && ptr == end && value >= 0.3f && value <= 5.0f) {
+                if (error == std::errc{} && ptr == end && value >= limits.minimumDuration && value <= limits.maximumDuration) {
                     result.flightDuration = value;
                 }
             } else if (key == "apex") {
@@ -82,7 +109,7 @@ namespace arrow {
 
                 const auto [ptr, error] = std::from_chars(begin, end, value);
 
-                if (error == std::errc{} && ptr == end && value >= 256.0f && value <= 4095.0f) {
+                if (error == std::errc{} && ptr == end && value >= limits.minimumApex && value <= limits.maximumApex) {
                     result.apex = value;
                 }
             }
