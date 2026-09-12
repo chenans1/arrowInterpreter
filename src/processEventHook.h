@@ -7,8 +7,8 @@ namespace arrow {
             float targetForward = {768.0f};
             float targetLateral = {0.0f};
             float radius = {196.0f};
-            float apex = {512.0f};
-            float duration = {1.0f};
+            float apex = {768.0f};
+            float duration = {1.2f};
 
             float ar_check = {128.0f};
         };

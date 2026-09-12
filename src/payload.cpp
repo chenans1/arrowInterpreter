@@ -4,9 +4,9 @@
 namespace arrow {
     //helpers for trimming strings
 
-    arrowPayload process(std::string_view payload) { 
-        arrowPayload result{};
-
+    arrowPayload process(std::string_view payload, const options& options) { 
+        // arrowPayload result{};
+        arrowPayload result = options.defaults;
         bool consumeSpecified = false;
         while (!payload.empty()) {
             const auto separator = payload.find('|');
@@ -49,7 +49,7 @@ namespace arrow {
 
                 const auto [ptr, error] = std::from_chars(begin, end, value);
 
-                if (error == std::errc{} && ptr == end && value >= 0.0f && value <= 1024.0f) {
+                if (error == std::errc{} && ptr == end && value >= 0.0f && value <= options.maximumSpread) {
                     result.spread = value;
                 }
             } else if (key == "count") {
@@ -57,7 +57,7 @@ namespace arrow {
 
                 const auto [ptr, error] = std::from_chars(begin, end, value);
 
-                if (error == std::errc{} && ptr == end && value >= 1 && value <= 15) {
+                if (error == std::errc{} && ptr == end && value >= 1 && value <= options.maximumCount) {
                     result.count = value;
                 }
             } else if (key == "consume") {
@@ -69,10 +69,26 @@ namespace arrow {
                     result.consume = value;
                     consumeSpecified = true;
                 }
+            } else if (key == "duration") {
+                float value{};
+
+                const auto [ptr, error] = std::from_chars(begin, end, value);
+
+                if (error == std::errc{} && ptr == end && value >= 0.3f && value <= 5.0f) {
+                    result.flightDuration = value;
+                }
+            } else if (key == "apex") {
+                float value{};
+
+                const auto [ptr, error] = std::from_chars(begin, end, value);
+
+                if (error == std::errc{} && ptr == end && value >= 256.0f && value <= 4095.0f) {
+                    result.apex = value;
+                }
             }
         }
 
-        if (!consumeSpecified) {
+        if (!consumeSpecified && options.consumeDefaultsToCount) {
             result.consume = result.count;
         }
         return result;

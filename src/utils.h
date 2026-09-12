@@ -68,16 +68,15 @@ namespace utils {
         const float lateralOffset = deltaX * rightX + deltaY * rightY;
 
         if (!std::isfinite(forwardOffset) || forwardOffset < minimumDistance) {
-            SKSE::log::info(
-                "[arrowInterpreter] Native crosshair target rejected: forwardOffset={}, horizontalDistance={}",
-                forwardOffset,horizontalDistance);
+            // SKSE::log::info("[arrowInterpreter] Native crosshair target rejected: forwardOffset={}, horizontalDistance={}",
+            //     forwardOffset,horizontalDistance);
             return std::nullopt;
         }
 
-        SKSE::log::info("[arrowInterpreter] Native crosshair target: origin=({}, {}, {}), point=({}, {}, {}), forwardOffset={}, lateralError={}",
-            launchOrigin.x, launchOrigin.y, launchOrigin.z,
-            target.x, target.y, target.z,
-            forwardOffset, lateralOffset);
+        // SKSE::log::info("[arrowInterpreter] Native crosshair target: origin=({}, {}, {}), point=({}, {}, {}), forwardOffset={}, lateralError={}",
+        //     launchOrigin.x, launchOrigin.y, launchOrigin.z,
+        //     target.x, target.y, target.z,
+        //     forwardOffset, lateralOffset);
         
         // return sqrt(forwardOffset*forwardOffset + lateralOffset*lateralOffset);
         return forwardOffset;
@@ -200,9 +199,9 @@ namespace utils {
         const float forwardOffset = deltaX * forwardX + deltaY * forwardY;
         const float lateralOffset = deltaX * rightX + deltaY * rightY;
 
-        SKSE::log::info(
-            "[arrowInterpreter] Crosshair raycast target: point=({}, {}, {}), forwardOffset={}, lateralError={}, hitFraction={}",
-            target.x, target.y, target.z, forwardOffset, lateralOffset, hitFraction);
+        // SKSE::log::info(
+        //     "[arrowInterpreter] Crosshair raycast target: point=({}, {}, {}), forwardOffset={}, lateralError={}, hitFraction={}",
+        //     target.x, target.y, target.z, forwardOffset, lateralOffset, hitFraction);
 
         if (!std::isfinite(forwardOffset) || forwardOffset < 32.0f) {
             return std::nullopt;

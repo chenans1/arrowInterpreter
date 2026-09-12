@@ -225,12 +225,23 @@ namespace arrow {
             log::info("[arrowInterpreter] Actor {:08X} has no ammunition equipped", actor->GetFormID());
             return;
         }
-        const auto params = process(payload);
 
-        //tag is arrow rain
         if (tag == "ArrowRain"sv) {
             ArrowData arrowRainData{ .isArrowRain = true };
-            float spread_radius = std::max(128.0f, params.spread);
+            const auto params = process(payload,
+            {
+                .defaults = {
+                    .damageMult = 0.20f,
+                    .count = 10,
+                    .spread = arrowRainData.radius,
+                    .consume = 3,
+                    .flightDuration = arrowRainData.duration,
+                    .apex = arrowRainData.apex
+                },
+                .maximumSpread = 1024.0f,
+                .maximumCount = 18,
+                .consumeDefaultsToCount = false
+            });
             if (params.consume > 0) {
                 const std::int32_t ammoCount = actor->GetInventoryItemCount(ammo);
                 if (ammoCount < static_cast<std::int32_t>(params.consume)) {
@@ -238,6 +249,11 @@ namespace arrow {
                     return;
                 }
             }
+
+            arrowRainData.radius = std::max(128.0f, params.spread);
+            arrowRainData.apex = params.apex;
+            arrowRainData.duration = params.flightDuration;
+            log::info("[releaseArrowRain] count={}, radius={}, consume={}", params.count, arrowRainData.radius, params.consume);
             if (actor->IsPlayerRef()) {
                 auto targetingOrigin = actor->GetPosition();
                 targetingOrigin.z += 96.0f;
@@ -266,7 +282,7 @@ namespace arrow {
             }
             return;
         }
-        // const auto params = process(payload);
+        const auto params = process(payload);
         //log::info("[releaseArrow] dmg={} count={} spread={} consume={}", params.damageMult, params.count, params.spread,
         //          params.consume);
         if (params.consume > 0) {
