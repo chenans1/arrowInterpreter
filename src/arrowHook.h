@@ -50,6 +50,8 @@ class arrowHook{
                 return _original(a_projectile, a_ref, a_targetLoc, a_velocity, a_collidable, a_arg6, a_arg7);
             }
 
+            auto* impact = _original(a_projectile, a_ref, a_targetLoc, a_velocity, a_collidable, a_arg6, a_arg7);
+            
             for (const auto& actorHandle : actorsVec) {
                 auto actor = actorHandle.get();
                 if (!actor) {
@@ -70,7 +72,12 @@ class arrowHook{
                     SKSE::log::info("[ArrowImpactHook] AddImpact: projectile={:p} Sucessfully found target", static_cast<void*>(a_projectile));
                 }
             }
-            return _original(a_projectile, a_ref, a_targetLoc, a_velocity, a_collidable, a_arg6, a_arg7);
+            a_projectile->GetMissileRuntimeData().impactResult = RE::ImpactResult::kDestroy;
+            // return _original(a_projectile, a_ref, a_targetLoc, a_velocity, a_collidable, a_arg6, a_arg7);
+            if (impact) {
+                impact->impactResult = RE::ImpactResult::kDestroy;
+            }
+            return impact;
         }   
 
         static inline REL::Relocation<decltype(AddImpact)> _original;

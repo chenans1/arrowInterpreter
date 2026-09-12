@@ -10,7 +10,7 @@ namespace arrow {
             float apex = {512.0f};
             float duration = {1.0f};
 
-            float ar_check = {256.0f};
+            float ar_check = {128.0f};
         };
     class ProcessEventHook {
         public:

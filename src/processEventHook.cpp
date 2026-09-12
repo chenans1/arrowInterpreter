@@ -89,7 +89,7 @@ namespace arrow {
         rotation.z = actor->GetAimHeading();
         RE::ProjectileHandle handle;
         RE::Projectile::LaunchData launchData(actor, origin, rotation, ammo, weapon);
-        launchData.autoAim = false;
+        // launchData.autoAim = false;
         //launchData.desiredTarget = nullptr;
         RE::Projectile::Launch(&handle, launchData);
         auto projectile = handle.get();
@@ -155,8 +155,8 @@ namespace arrow {
 
         RE::ProjectileHandle handle;
         RE::Projectile::LaunchData launchData(actor, origin, rotation, ammo, weapon);
-        launchData.autoAim = false;
-        launchData.desiredTarget = nullptr;
+        // launchData.autoAim = false;
+        // launchData.desiredTarget = nullptr;
         RE::Projectile::Launch(&handle, launchData);
         auto projectile = handle.get();
         if (!projectile) {
