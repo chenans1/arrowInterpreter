@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <optional>
+
 namespace payloadAlias {
     struct PayloadOverride{
         std::optional<float> damageMult;
@@ -10,5 +13,5 @@ namespace payloadAlias {
         std::optional<float> apex;
     };
 
-    
+    void Load();
 }

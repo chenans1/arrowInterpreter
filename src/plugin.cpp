@@ -6,6 +6,7 @@
 
 #include "processEventHook.h"
 #include "arrowHook.h"
+#include "payloadAlias.h"
 
 using namespace SKSE;
 using namespace SKSE::log;
@@ -45,6 +46,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* skse) {
     auto version = plugin->GetVersion();
     log::info("{} {} is loading...", plugin->GetName(), version);
     SKSE::Init(skse);
+    payloadAlias::Load();
     arrow::ProcessEventHook::Install();
     arrowHook::Install();
     SKSE::AllocTrampoline(14);
