@@ -40,24 +40,83 @@ namespace arrow {
 
         //hook locations derived from TDM, doing a hook after TDM to avoid dll alphabetical sorting shenanigans
         REL::Relocation<std::uintptr_t> hook{RELOCATION_ID(43030, 44222)};
-
         _InitProjectile = trampoline.write_call<5>(hook.address() + REL::Relocate(0x3B8, 0x78A), InitProjectile);
         
-
-
         log::info("[processEventHook] ...Projectile hook installed");
     }
+    
+    struct ShotEffects { 
+        RE::InventoryEntryData* weaponEntry{ nullptr };
+        RE::EnchantmentItem* weaponEnchantment{ nullptr };
+        RE::AlchemyItem* poison{ nullptr };
+    };
 
-    static bool releaseArrowOffset(RE::TESAmmo* ammo, RE::TESObjectWEAP* weapon, RE::Actor* actor, float damageMult = 1.0f, float offset = 0.0f) {
-        if (!ammo || !weapon || !actor) {
-            log::info("[arrowInterpreter] invalid params for releaseArrow()");
-            return false;
+    //not directly exposed in commonlib, but is in add library
+    static RE::AlchemyItem* getPoison(RE::InventoryEntryData* entry) {
+        if (!entry) {
+            return nullptr;
+        }
+        using func_t = RE::AlchemyItem* (*)(RE::InventoryEntryData*);
+        static REL::Relocation<func_t> func{REL::RelocationID(15761, 15999)};
+        return func(entry);
+    }
+
+    static void decrementPoison(RE::InventoryEntryData* entry) {
+        if (!entry) {
+            return;
+        }
+        using func_t = void (*)(RE::InventoryEntryData*);
+        static REL::Relocation<func_t> func{REL::RelocationID(15762, 16000)};
+        return func(entry);
+    }
+
+    //consumes and then passes effects?
+    static std::optional<ShotEffects> prepareShot(RE::Actor* actor, RE::TESObjectWEAP* weapon) {
+        if (!actor || !weapon) {
+            return ShotEffects{};
+        }
+        //get specific instance?
+        auto* entry = actor->GetEquippedEntryData(false);
+        if (!entry || entry->object != weapon) {
+            log::warn("[arrowInterpreter] Equipped weapon entry does not match {:08X}", weapon->GetFormID());
+            return ShotEffects{};
         }
 
+        ShotEffects effects;
+        effects.weaponEntry = entry;
+
+        effects.weaponEnchantment = entry->GetEnchantment();
+        effects.poison = getPoison(entry);
+        if (effects.weaponEnchantment) {
+            const float cost = std::max(0.0f, effects.weaponEnchantment->CalculateMagickaCost(actor));
+            const float availableCharge = actor->AsActorValueOwner()->GetActorValue(RE::ActorValue::kRightItemCharge);
+            if (std::floor(cost) > availableCharge){
+                effects.weaponEnchantment = nullptr;
+                if (actor->IsPlayerRef()) {
+                    RE::HUDMenu::FlashMeter(RE::ActorValue::kRightItemCharge);
+                }
+            } else if (cost > 0.0f) {
+                // RE::ActorValueOwner* actorAV = actor->AsActorValueOwner();
+                actor->AsActorValueOwner()->DamageActorValue(RE::ActorValue::kRightItemCharge, cost);
+            }   
+        }
+
+        if (effects.poison) {
+            decrementPoison(effects.weaponEntry);
+        }
+
+        return effects;
+    }
+
+    static RE::NiPointer<RE::Projectile> requestLaunch(RE::TESAmmo* ammo, RE::TESObjectWEAP* weapon, RE::Actor* actor, const ShotEffects& effects, float damageMult = 1.0f) {
+        if (!ammo || !weapon || !actor) {
+            log::info("[arrowInterpreter] invalid params for queueLaunch()");
+            return nullptr;
+        }
         auto* currentProcess = actor->GetActorRuntimeData().currentProcess;
         if (!currentProcess) {
             log::warn("[arrowInterpreter] Actor {:08X} has no current process", actor->GetFormID());
-            return false;
+            return nullptr;
         }
 
         //fetches the weapon node, not sure if this is a good idea.
@@ -74,16 +133,11 @@ namespace arrow {
 
         RE::NiPoint3 origin;
         RE::Projectile::ProjectileRot rotation{};
-
-        if (weapon3D) {
+         if (weapon3D) {
             origin = weapon3D->world.translate;
-            //rotation.x = actor->GetAimAngle();
-            //rotation.z = actor->GetAimHeading();
         } else {
             origin = actor->GetPosition();
             origin.z += 96.0f;
-            //rotation.x = actor->GetAimAngle();
-            //rotation.z = actor->GetAimHeading();
             log::warn("[arrowInterpreter] No weapon/fire node; using actor fallback");
         }
 
@@ -91,13 +145,14 @@ namespace arrow {
         rotation.z = actor->GetAimHeading();
         RE::ProjectileHandle handle;
         RE::Projectile::LaunchData launchData(actor, origin, rotation, ammo, weapon);
-        // launchData.autoAim = false;
-        //launchData.desiredTarget = nullptr;
+        launchData.enchantItem = effects.weaponEnchantment;
+        launchData.poison = effects.poison;
+
         RE::Projectile::Launch(&handle, launchData);
         auto projectile = handle.get();
         if (!projectile) {
             log::error("[arrowInterpreter] Failed to launch arrow for actor {:08X}", actor->GetFormID());
-            return false;
+            return nullptr;
         }
         auto& projectileData = projectile->GetProjectileRuntimeData();
         if (projectileData.power > 0.0f) {
@@ -105,74 +160,23 @@ namespace arrow {
             projectileData.power = 1.0f;
             projectileData.weaponDamage *= damageMult;
         }
-        //log::info("offset deg={}, offset rad={}",offset, RE::deg_to_rad(offset));
 
+        return projectile;
+    }
+
+    static bool releaseArrowOffset(RE::TESAmmo* ammo, RE::TESObjectWEAP* weapon, RE::Actor* actor, const ShotEffects& effects, float damageMult = 1.0f, float offset = 0.0f) {
+        auto projectile = requestLaunch(ammo, weapon, actor, effects, damageMult);
+        if (!projectile) return false;
         if (offset != 0.0f) {
             ProcessEventHook::AddPendingArrow(projectile.get(), {.offset = RE::deg_to_rad(offset)});
         }
-        //auto point = projectile->GetAngle();
-        //log::info("[arrowInterpreter] Original Angle=({}, {}, {})", point.x, point.y, point.z);
-        //point.z -= offset;
-        //projectile->SetAngle(point);
-        //log::info("[arrowInterpreter] Original Angle=({}, {}, {})", projectile->GetAngle().x, projectile->GetAngle().y, projectile->GetAngle().z);
         return true;
     }
 
     //releases arrow rain in a circle, hopefully. Idk lol
-    static bool ReleaseArrowRain(RE::TESAmmo* ammo, RE::TESObjectWEAP* weapon, RE::Actor* actor, ArrowData a_data, float damageMult=1.0f) {
-        if (!ammo || !weapon || !actor) {
-            log::info("[arrowInterpreter] invalid params for releaseArrow()");
-            return false;
-        }
-
-        auto* currentProcess = actor->GetActorRuntimeData().currentProcess;
-        if (!currentProcess) {
-            log::warn("[arrowInterpreter] Actor {:08X} has no current process", actor->GetFormID());
-            return false;
-        }
-        // fetches the weapon node, not sure if this is a good idea.
-        const auto& biped = actor->GetBiped2();
-        RE::NiAVObject* weapon3D = nullptr;
-
-        for (std::size_t i = 0; i < RE::BIPED_OBJECTS::kTotal; ++i) {
-            auto& object = biped->objects[i];
-            if (object.item == weapon && object.partClone) {
-                weapon3D = object.partClone.get();
-                break;
-            }
-        }
-        RE::NiPoint3 origin;
-        RE::Projectile::ProjectileRot rotation{};
-
-        if (weapon3D) {
-            origin = weapon3D->world.translate;
-        } else {
-            origin = actor->GetPosition();
-            origin.z += 96.0f;
-            log::warn("[arrowInterpreter] No weapon/fire node; using actor fallback");
-        }
-
-        rotation.x = actor->GetAimAngle(); 
-        rotation.z = actor->GetAimHeading();
-
-        RE::ProjectileHandle handle;
-        RE::Projectile::LaunchData launchData(actor, origin, rotation, ammo, weapon);
-        // launchData.autoAim = false;
-        // launchData.desiredTarget = nullptr;
-        RE::Projectile::Launch(&handle, launchData);
-        auto projectile = handle.get();
-        if (!projectile) {
-            log::error("[arrowInterpreter] Failed to launch arrowRain for actor {:08X}", actor->GetFormID());
-            return false;
-        }
-        auto& projectileData = projectile->GetProjectileRuntimeData();
-        if (projectileData.power > 0.0f) {
-            projectileData.weaponDamage /= projectileData.power;
-            projectileData.power = 1.0f;
-            projectileData.weaponDamage *= damageMult;
-            //projectileData.scale *= 2.0f;
-        }
-        
+    static bool ReleaseArrowRain(RE::TESAmmo* ammo, RE::TESObjectWEAP* weapon, RE::Actor* actor, ArrowData a_data, const ShotEffects& effects, float damageMult=1.0f) {
+        auto projectile = requestLaunch(ammo, weapon, actor, effects, damageMult);
+        if (!projectile) return false;
         if (a_data.radius > 0.0f) {
             const float angle = randomFloat(0.0f, 2.0f * 3.1415926f);
             const float offset_radius = a_data.radius * std::sqrt(randomFloat(0.0f, 1.0f));
@@ -218,7 +222,7 @@ namespace arrow {
         auto* equippedForm = actor->GetEquippedObject(false);
         auto* weapon = equippedForm ? equippedForm->As<RE::TESObjectWEAP>() : nullptr;
 
-        if (!weapon || !weapon->IsBow() && !weapon->IsCrossbow()) {
+        if (!weapon || (!weapon->IsBow() && !weapon->IsCrossbow())) {
             log::info("[arrowInterpreter] Actor {:08X} has no bow or crossbow equipped", actor->GetFormID());
             return;
         }
@@ -235,7 +239,7 @@ namespace arrow {
             log::info("[arrowInterpreter] Actor {:08X} has incompatible weapon/ammo types",actor->GetFormID());
             return;
         }
-
+        
         if (isArrowRain) {
             ArrowData arrowRainData{ .isArrowRain = true };
             const auto params = process(payload,
@@ -282,8 +286,13 @@ namespace arrow {
             arrowRainData.targetForward = std::max(128.0f, arrowRainData.targetForward);
             // log::info("[arrowInterpreter] Actor {:08X} released arrow rain", actor->GetFormID());
             // ReleaseArrowRain(ammo, bow, actor, arrowRainData, 0.20f);
+            auto effects = prepareShot(actor, weapon);
+            if (!effects) {
+                log::info("[arrowInterpreter] No effects for arrow rain?",actor->GetFormID());
+                return;
+            }
             for (std::uint32_t i = 0; i < params.count; ++i) {
-                ReleaseArrowRain(ammo, weapon, actor, arrowRainData, params.damageMult);
+                ReleaseArrowRain(ammo, weapon, actor, arrowRainData, *effects, params.damageMult);
             }
 
             if (params.consume > 0) {
@@ -302,9 +311,13 @@ namespace arrow {
                     return;
             }
         }
-        
+        auto effects = prepareShot(actor, weapon);
+        if (!effects) {
+                log::info("[arrowInterpreter] No effects for spreadshot?",actor->GetFormID());
+                return;
+            }
         if (params.count == 1) {
-            if (!releaseArrowOffset(ammo, weapon, actor, params.damageMult, 0.0f)) {
+            if (!releaseArrowOffset(ammo, weapon, actor, *effects, params.damageMult, 0.0f)) {
                 return;
             }
         } else {
@@ -315,7 +328,7 @@ namespace arrow {
             for (std::uint32_t i = 0; i < params.count; ++i) {
                 const float offset = start + step * static_cast<float>(i);
                 //log::info("[releaseArrow]: fired w/ offset={}", offset);
-                releaseArrowOffset(ammo, weapon, actor, params.damageMult, offset);
+                releaseArrowOffset(ammo, weapon, actor, *effects, params.damageMult, offset);
             }
         }
 
