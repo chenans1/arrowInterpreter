@@ -213,16 +213,23 @@ namespace arrow {
         //process payload
         //check for actor equipped items - need equipped bow and arrows
         auto* equippedForm = actor->GetEquippedObject(false);
-        auto* bow = equippedForm ? equippedForm->As<RE::TESObjectWEAP>() : nullptr;
+        auto* weapon = equippedForm ? equippedForm->As<RE::TESObjectWEAP>() : nullptr;
 
-        if (!bow || !bow->IsBow()) {
-            log::info("[arrowInterpreter] Actor {:08X} has no bow equipped", actor->GetFormID());
+        if (!weapon || !weapon->IsBow() && !weapon->IsCrossbow()) {
+            log::info("[arrowInterpreter] Actor {:08X} has no bow or crossbow equipped", actor->GetFormID());
             return;
         }
 
         auto* ammo = actor->GetCurrentAmmo();
         if (!ammo) {
             log::info("[arrowInterpreter] Actor {:08X} has no ammunition equipped", actor->GetFormID());
+            return;
+        }
+        const bool usesBolts = weapon->IsCrossbow();
+        const bool ammoIsBolt = ammo->IsBolt();
+
+        if (usesBolts != ammoIsBolt) {
+            log::info("[arrowInterpreter] Actor {:08X} has incompatible weapon/ammo types",actor->GetFormID());
             return;
         }
 
@@ -273,7 +280,7 @@ namespace arrow {
             // log::info("[arrowInterpreter] Actor {:08X} released arrow rain", actor->GetFormID());
             // ReleaseArrowRain(ammo, bow, actor, arrowRainData, 0.20f);
             for (std::uint32_t i = 0; i < params.count; ++i) {
-                ReleaseArrowRain(ammo, bow, actor, arrowRainData, params.damageMult);
+                ReleaseArrowRain(ammo, weapon, actor, arrowRainData, params.damageMult);
             }
 
             if (params.consume > 0) {
@@ -294,7 +301,7 @@ namespace arrow {
         }
         
         if (params.count == 1) {
-            if (!releaseArrowOffset(ammo, bow, actor, params.damageMult, 0.0f)) {
+            if (!releaseArrowOffset(ammo, weapon, actor, params.damageMult, 0.0f)) {
                 return;
             }
         } else {
@@ -305,7 +312,7 @@ namespace arrow {
             for (std::uint32_t i = 0; i < params.count; ++i) {
                 const float offset = start + step * static_cast<float>(i);
                 //log::info("[releaseArrow]: fired w/ offset={}", offset);
-                releaseArrowOffset(ammo, bow, actor, params.damageMult, offset);
+                releaseArrowOffset(ammo, weapon, actor, params.damageMult, offset);
             }
         }
 
