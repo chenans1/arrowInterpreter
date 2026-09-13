@@ -1,6 +1,7 @@
 #include "PCH.h"
 #include "payload.h"
 #include "payloadAlias.h"
+#include "utils.h"
 
 using namespace SKSE;
 using namespace SKSE::log;
@@ -80,38 +81,38 @@ namespace arrow {
                 const char* begin = valueString.data();
                 const char* end = begin + valueString.size();
 
-                if (key == "dmg") {
+                if (utils::EqualsIgnoreCase(key, "dmg")) {
                     float value{};
                     const auto [ptr, error] = std::from_chars(begin, end, value);
                     if (error == std::errc{} && ptr == end && value >= limits.minimumDamage && value <= limits.maximumDamage) {
                         result.damageMult = value;
                     }
-                } else if (key == "spread") {
+                } else if (utils::EqualsIgnoreCase(key, "spread")) {
                     float value{};
                     const auto [ptr, error] = std::from_chars(begin, end, value);
                     if (error == std::errc{} && ptr == end && value >= limits.minimumSpread && value <= limits.maximumSpread) {
                         result.spread = value;
                     }
-                } else if (key == "count") {
+                } else if (utils::EqualsIgnoreCase(key, "count")) {
                     std::uint32_t value{};
                     const auto [ptr, error] = std::from_chars(begin, end, value);
                     if (error == std::errc{} && ptr == end && value >= limits.minimumCount && value <= limits.maximumCount) {
                         result.count = value;
                     }
-                } else if (key == "consume") {
+                } else if (utils::EqualsIgnoreCase(key, "consume")) {
                     std::uint32_t value{};
                     const auto [ptr, error] = std::from_chars(begin, end, value);
                     if (error == std::errc{} && ptr == end && value >= limits.minimumConsume && value <= limits.maximumConsume) {
                         result.consume = value;
                         consumeSpecified = true;
                     }
-                } else if (key == "duration") {
+                } else if (utils::EqualsIgnoreCase(key, "duration")) {
                     float value{};
                     const auto [ptr, error] = std::from_chars(begin, end, value);
                     if (error == std::errc{} && ptr == end && value >= limits.minimumDuration && value <= limits.maximumDuration) {
                         result.flightDuration = value;
                     }
-                } else if (key == "apex") {
+                } else if (utils::EqualsIgnoreCase(key, "apex")) {
                     float value{};
                     const auto [ptr, error] = std::from_chars(begin, end, value);
                     if (error == std::errc{} && ptr == end && value >= limits.minimumApex && value <= limits.maximumApex) {

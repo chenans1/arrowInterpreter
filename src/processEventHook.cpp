@@ -207,7 +207,10 @@ namespace arrow {
 
         const auto& tag = a_event->tag;
         const auto& payload = a_event->payload;
-        if (tag != "arrowInterpreter"sv && tag != "ArrowRain"sv) {
+        const std::string_view tagName{ tag.data() };
+        const bool isArrowInterpreter = utils::EqualsIgnoreCase(tagName, "arrowInterpreter");
+        const bool isArrowRain = utils::EqualsIgnoreCase(tagName, "ArrowRain");
+        if (!isArrowInterpreter && !isArrowRain) {
             return;
         }
         //process payload
@@ -233,7 +236,7 @@ namespace arrow {
             return;
         }
 
-        if (tag == "ArrowRain"sv) {
+        if (isArrowRain) {
             ArrowData arrowRainData{ .isArrowRain = true };
             const auto params = process(payload,
             {

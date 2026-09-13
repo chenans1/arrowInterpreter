@@ -290,4 +290,18 @@ namespace utils {
         };
     }
 
+    static inline bool EqualsIgnoreCase(std::string_view left, std::string_view right) {
+        if (left.size() != right.size()) {
+            return false;
+        }
+        for (std::size_t i = 0; i < left.size(); ++i) {
+            const auto lower = [](char character) {
+                return character >= 'A' && character <= 'Z' ? static_cast<char>(character + ('a' - 'A')) : character;
+            };
+            if (lower(left[i]) != lower(right[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
 }

@@ -1,5 +1,6 @@
 #include "PCH.h"
 #include "payloadAlias.h"
+#include "utils.h"
 
 #include <algorithm>
 #include <charconv>
@@ -20,6 +21,33 @@ namespace payloadAlias {
     AliasMap aliases;
 
     namespace {
+        char ToLowerAscii(char character)
+        {
+            return character >= 'A' && character <= 'Z' ? static_cast<char>(character + ('a' - 'A')) : character;
+        }
+
+        std::string NormalizeIdentifier(std::string_view identifier)
+        {
+            std::string result(identifier);
+            std::ranges::transform(result, result.begin(), ToLowerAscii);
+            return result;
+        }
+
+        nlohmann::json::const_iterator FindMemberIgnoreCase(
+            const nlohmann::json& object,
+            std::string_view key)
+        {
+            if (!object.is_object()) {
+                return object.cend();
+            }
+            for (auto member = object.cbegin(); member != object.cend(); ++member) {
+                if (utils::EqualsIgnoreCase(member.key(), key)) {
+                    return member;
+                }
+            }
+            return object.cend();
+        }
+
         std::optional<float> ReadFloat(const nlohmann::json& value) {
             float result{};
             if (value.is_number()) {
@@ -67,13 +95,13 @@ namespace payloadAlias {
         }
 
         void ReadFloatMember(const nlohmann::json& object, const char* key, std::optional<float>& destination) {
-            if (const auto member = object.find(key); member != object.end()) {
+            if (const auto member = FindMemberIgnoreCase(object, key); member != object.end()) {
                 destination = ReadFloat(*member);
             }
         }
 
         void ReadUnsignedMember(const nlohmann::json& object, const char* key, std::optional<std::uint32_t>& destination) {
-            if (const auto member = object.find(key); member != object.end()) {
+            if (const auto member = FindMemberIgnoreCase(object, key); member != object.end()) {
                 destination = ReadUnsigned(*member);
             }
         }
@@ -118,7 +146,7 @@ namespace payloadAlias {
             }
 
             const auto filename = entry.path().filename().string();
-            if (filename.ends_with(".json")) {
+            if (filename.size() >= 5 && utils::EqualsIgnoreCase(std::string_view(filename).substr(filename.size() - 5), ".json")) {
                 configFiles.push_back(entry.path());
             }
         }
@@ -141,7 +169,7 @@ namespace payloadAlias {
                 }
 
                 const auto document = nlohmann::json::parse(stream);
-                const auto aliasObject = document.find("aliases");
+                const auto aliasObject = FindMemberIgnoreCase(document, "aliases");
                 if (aliasObject == document.end() || !aliasObject->is_object()) {
                     log::warn("[PayloadAlias] {} has no aliases object", path.filename().string());
                     continue;
@@ -154,7 +182,7 @@ namespace payloadAlias {
                         continue;
                     }
 
-                    aliases.insert_or_assign(aliasName, ReadOverride(aliasValue));
+                    aliases.insert_or_assign(NormalizeIdentifier(aliasName), ReadOverride(aliasValue));
                     ++fileAliases;
                 }
 
@@ -171,7 +199,7 @@ namespace payloadAlias {
     }
 
     std::optional<PayloadOverride> find(std::string_view alias) {
-        const auto found = aliases.find(std::string(alias));
+        const auto found = aliases.find(NormalizeIdentifier(alias));
         if (found == aliases.end()) {
             log::info("[PayloadAlias] {} alias not found", alias);
             return std::nullopt;
