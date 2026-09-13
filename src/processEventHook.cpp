@@ -61,14 +61,14 @@ namespace arrow {
         return func(entry);
     }
 
-    static void decrementPoison(RE::InventoryEntryData* entry) {
-        if (!entry) {
-            return;
-        }
-        using func_t = void (*)(RE::InventoryEntryData*);
-        static REL::Relocation<func_t> func{REL::RelocationID(15762, 16000)};
-        return func(entry);
-    }
+    // static void decrementPoison(RE::InventoryEntryData* entry) {
+    //     if (!entry) {
+    //         return;
+    //     }
+    //     using func_t = void (*)(RE::InventoryEntryData*);
+    //     static REL::Relocation<func_t> func{REL::RelocationID(15762, 16000)};
+    //     return func(entry);
+    // }
 
     //consumes and then passes effects?
     static std::optional<ShotEffects> prepareShot(RE::Actor* actor, RE::TESObjectWEAP* weapon) {
@@ -87,23 +87,25 @@ namespace arrow {
 
         effects.weaponEnchantment = entry->GetEnchantment();
         effects.poison = getPoison(entry);
-        if (effects.weaponEnchantment) {
-            const float cost = std::max(0.0f, effects.weaponEnchantment->CalculateMagickaCost(actor));
-            const float availableCharge = actor->AsActorValueOwner()->GetActorValue(RE::ActorValue::kRightItemCharge);
-            if (std::floor(cost) > availableCharge){
-                effects.weaponEnchantment = nullptr;
-                if (actor->IsPlayerRef()) {
-                    RE::HUDMenu::FlashMeter(RE::ActorValue::kRightItemCharge);
-                }
-            } else if (cost > 0.0f) {
-                // RE::ActorValueOwner* actorAV = actor->AsActorValueOwner();
-                actor->AsActorValueOwner()->DamageActorValue(RE::ActorValue::kRightItemCharge, cost);
-            }   
-        }
 
-        if (effects.poison) {
-            decrementPoison(effects.weaponEntry);
-        }
+        //unecessary: game actually modifies this already. 
+        // if (effects.weaponEnchantment) {
+        //     const float cost = std::max(0.0f, effects.weaponEnchantment->CalculateMagickaCost(actor));
+        //     const float availableCharge = actor->AsActorValueOwner()->GetActorValue(RE::ActorValue::kRightItemCharge);
+        //     if (std::floor(cost) > availableCharge){
+        //         effects.weaponEnchantment = nullptr;
+        //         if (actor->IsPlayerRef()) {
+        //             RE::HUDMenu::FlashMeter(RE::ActorValue::kRightItemCharge);
+        //         }
+        //     } else if (cost > 0.0f) {
+        //         // RE::ActorValueOwner* actorAV = actor->AsActorValueOwner();
+        //         actor->AsActorValueOwner()->DamageActorValue(RE::ActorValue::kRightItemCharge, cost);
+        //     }   
+        // }
+
+        // if (effects.poison) {
+        //     decrementPoison(effects.weaponEntry);
+        // }
 
         return effects;
     }
