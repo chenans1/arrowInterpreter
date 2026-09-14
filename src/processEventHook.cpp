@@ -55,23 +55,23 @@ namespace arrow {
     };
 
     //not directly exposed in commonlib, but is in add library
-    static RE::AlchemyItem* getPoison(RE::InventoryEntryData* entry) {
-        if (!entry) {
-            return nullptr;
-        }
-        using func_t = RE::AlchemyItem* (*)(RE::InventoryEntryData*);
-        static REL::Relocation<func_t> func{REL::RelocationID(15761, 15999)};
-        return func(entry);
-    }
+    // static RE::AlchemyItem* getPoison(RE::InventoryEntryData* entry) {
+    //     if (!entry) {
+    //         return nullptr;
+    //     }
+    //     using func_t = RE::AlchemyItem* (*)(RE::InventoryEntryData*);
+    //     static REL::Relocation<func_t> func{REL::RelocationID(15761, 15999)};
+    //     return func(entry);
+    // }
 
-    static void decrementPoison(RE::InventoryEntryData* entry) {
-        if (!entry) {
-            return;
-        }
-        using func_t = void (*)(RE::InventoryEntryData*);
-        static REL::Relocation<func_t> func{REL::RelocationID(15762, 16000)};
-        return func(entry);
-    }
+    // static void decrementPoison(RE::InventoryEntryData* entry) {
+    //     if (!entry) {
+    //         return;
+    //     }
+    //     using func_t = void (*)(RE::InventoryEntryData*);
+    //     static REL::Relocation<func_t> func{REL::RelocationID(15762, 16000)};
+    //     return func(entry);
+    // }
 
     //consumes and then passes effects?
     static std::optional<ShotEffects> prepareShot(RE::Actor* actor, RE::TESObjectWEAP* weapon) {
@@ -90,10 +90,10 @@ namespace arrow {
 
         if (EnchantCooldown::applyCD(actor)) {
             effects.weaponEnchantment = entry->GetEnchantment();
-            effects.poison = getPoison(entry);
-            if (effects.poison) {
-                decrementPoison(effects.weaponEntry);
-            }
+            // effects.poison = getPoison(entry);
+            // if (effects.poison) {
+            //     decrementPoison(effects.weaponEntry);
+            // }
         }
         // else {
         //     log::info("[arrowInterpreter] Actor {:08X} has enchant CD", actor->GetFormID());
