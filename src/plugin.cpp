@@ -7,6 +7,7 @@
 #include "processEventHook.h"
 #include "arrowHook.h"
 #include "payloadAlias.h"
+#include "enchantCooldown.h"
 
 using namespace SKSE;
 using namespace SKSE::log;
@@ -51,9 +52,15 @@ SKSEPluginLoad(const SKSE::LoadInterface* skse) {
     arrowHook::Install();
     SKSE::AllocTrampoline(14);
     SKSE::GetMessagingInterface()->RegisterListener([](SKSE::MessagingInterface::Message* msg) {
-        if (msg->type == SKSE::MessagingInterface::kPostLoad) {
-            arrow::ProcessEventHook::InstallProjectileHook();
-        }
+        switch (msg->type) {
+            case SKSE::MessagingInterface::kDataLoaded:
+                EnchantCooldown::LoadForms();
+                break;
+
+            case SKSE::MessagingInterface::kPostLoad:
+                arrow::ProcessEventHook::InstallProjectileHook();
+                break;
+            }
     });
     log::info("{} has finished loading.", plugin->GetName());
     return true;

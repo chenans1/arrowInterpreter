@@ -1,11 +1,14 @@
 #include "PCH.h"
 #include "processEventHook.h"
 #include "payload.h"
+#include "utils.h"
+#include "enchantCooldown.h"
+
 #include <cmath>
 #include <numbers>
 #include <optional>
 #include <random>
-#include "utils.h"
+
 
 using namespace SKSE;
 using namespace SKSE::log;
@@ -61,14 +64,14 @@ namespace arrow {
         return func(entry);
     }
 
-    // static void decrementPoison(RE::InventoryEntryData* entry) {
-    //     if (!entry) {
-    //         return;
-    //     }
-    //     using func_t = void (*)(RE::InventoryEntryData*);
-    //     static REL::Relocation<func_t> func{REL::RelocationID(15762, 16000)};
-    //     return func(entry);
-    // }
+    static void decrementPoison(RE::InventoryEntryData* entry) {
+        if (!entry) {
+            return;
+        }
+        using func_t = void (*)(RE::InventoryEntryData*);
+        static REL::Relocation<func_t> func{REL::RelocationID(15762, 16000)};
+        return func(entry);
+    }
 
     //consumes and then passes effects?
     static std::optional<ShotEffects> prepareShot(RE::Actor* actor, RE::TESObjectWEAP* weapon) {
@@ -85,8 +88,16 @@ namespace arrow {
         ShotEffects effects;
         effects.weaponEntry = entry;
 
-        effects.weaponEnchantment = entry->GetEnchantment();
-        effects.poison = getPoison(entry);
+        if (EnchantCooldown::applyCD(actor)) {
+            effects.weaponEnchantment = entry->GetEnchantment();
+            effects.poison = getPoison(entry);
+            if (effects.poison) {
+                decrementPoison(effects.weaponEntry);
+            }
+        }
+        // else {
+        //     log::info("[arrowInterpreter] Actor {:08X} has enchant CD", actor->GetFormID());
+        // }
 
         //unecessary: game actually modifies this already. 
         // if (effects.weaponEnchantment) {
@@ -101,10 +112,6 @@ namespace arrow {
         //         // RE::ActorValueOwner* actorAV = actor->AsActorValueOwner();
         //         actor->AsActorValueOwner()->DamageActorValue(RE::ActorValue::kRightItemCharge, cost);
         //     }   
-        // }
-
-        // if (effects.poison) {
-        //     decrementPoison(effects.weaponEntry);
         // }
 
         return effects;
